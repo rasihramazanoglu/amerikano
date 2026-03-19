@@ -5,7 +5,7 @@ const SUITS = ["♠","♥","♦","♣"];
 const RANKS = ["A","2","3","4","5","6","7","8","9","10","J","Q","K"];
 const RANK_VALUES = {A:15,2:5,3:5,4:5,5:5,6:5,7:5,8:5,9:5,10:10,J:10,Q:10,K:10};
 const RANK_ORDER  = {A:1,2:2,3:3,4:4,5:5,6:6,7:7,8:8,9:9,10:10,J:11,Q:12,K:13};
-const AI_NAMES    = ["Sofia","Marco","Leila"];
+const AI_NAMES    = ["Player 3","Player 2","Player 4"]; // ai0=top, ai1=left, ai2=right
 
 const CONTRACTS = [
   {round:1,desc:"2 Sets of 3",        sets:2,runs:0},
@@ -74,15 +74,17 @@ function aiDiscard(hand){
 // AI decides whether to buy a discarded card
 // Returns true if the card is useful (completes a pair/run) and buys < 3
 function aiBuyDecision(hand,card,buysUsed,metContract){
-  if(metContract||buysUsed>=3||card.isJoker) return card.isJoker && !metContract && buysUsed<3;
+  if(metContract||buysUsed>=3) return false;
+  if(card.isJoker) return Math.random()<0.6; // jokers are valuable
   const rg={};
   hand.forEach(c=>{if(!c.isJoker){rg[c.rank]=rg[c.rank]||[];rg[c.rank].push(c);}});
-  // Buy if it completes a pair for a set
-  if(rg[card.rank]&&rg[card.rank].length>=1) return Math.random()<0.7;
-  // Buy if it fits a suit run
-  const samesuit=hand.filter(c=>c.suit===card.suit&&!c.isJoker);
-  if(samesuit.length>=2) return Math.random()<0.5;
-  return false;
+  // Only buy if card completes a triple (2 already in hand) — strong signal
+  if(rg[card.rank]&&rg[card.rank].length>=2) return Math.random()<0.6;
+  // Buy if it extends a 3+ card run sequence
+  const samesuit=hand.filter(c=>c.suit===card.suit&&!c.isJoker)
+    .sort((a,b)=>({A:1,2:2,3:3,4:4,5:5,6:6,7:7,8:8,9:9,10:10,J:11,Q:12,K:13}[a.rank]-{A:1,2:2,3:3,4:4,5:5,6:6,7:7,8:8,9:9,10:10,J:11,Q:12,K:13}[b.rank]));
+  if(samesuit.length>=3) return Math.random()<0.4;
+  return false; // otherwise don't buy
 }
 function aiBuildMelds(hand,contract){
   const rg={},sg={};
@@ -114,7 +116,7 @@ function aiBuildMelds(hand,contract){
 // ── Buy eligibility ──────────────────────────────────────────────────────────
 // Returns ordered list of player turns that are eligible to buy (clockwise, skip active)
 function buyEligible(activeTurn, metContract, buysUsed){
-  const order=["player","ai0","ai1","ai2"];
+  const order=TURN_ORDER; // same clockwise order as play
   const activeIdx=order.indexOf(activeTurn);
   // clockwise starting after active player
   const eligible=[];
@@ -127,7 +129,7 @@ function buyEligible(activeTurn, metContract, buysUsed){
 }
 
 // ── Turn helpers ──────────────────────────────────────────────────────────────
-const TURN_ORDER=["player","ai0","ai1","ai2"];
+const TURN_ORDER=["player","ai1","ai0","ai2"]; // clockwise: bottom→left→top→right
 function nextTurn(cur){return TURN_ORDER[(TURN_ORDER.indexOf(cur)+1)%4];}
 function pIdx(turn){return turn==="player"?0:parseInt(turn[2])+1;}
 function turnName(turn){return turn==="player"?"You":AI_NAMES[parseInt(turn[2])];}
@@ -151,10 +153,12 @@ function dealRound(roundIndex,gameScores){
     selectedCards:[],
     stagingGroups:[],
     // buying state
-    buyWindow:false,           // true = buy window is open
-    buyWindowCard:null,        // the card up for buying
-    buyWindowFor:null,         // whose turn it was when discard happened (they draw from deck instead)
-    buyWindowNext:null,        // who draws next after buy resolves
+    buyWindow:false,
+    buyWindowCard:null,
+    buyWindowFor:null,
+    buyWindowNext:null,
+    buyWindowTail:[], // AIs still to decide after player passes
+    actionLog:[],              // recent events shown in the feed
     message:firstPlayer==="player"
       ?"You go first — 14 cards. Select 1 to discard."
       :`${turnName(firstPlayer)} goes first (14 cards)…`,
@@ -185,49 +189,72 @@ function endRound(state,winnerTurn,hands,lastDiscard){
 }
 
 // ── Post-discard buy resolution ──────────────────────────────────────────────
-// After any discard: AI players decide to buy immediately (clockwise).
-// If player is eligible (i.e. an AI discarded), open the buy window for them.
-// If player discarded, AIs auto-decide, then turn advances — player can't buy own discard.
+// Clockwise order is respected strictly:
+// - AIs before the player in clockwise order auto-decide first
+// - If none of them buy, the player gets the buy window
+// - If the player passes (PASS_BUY), remaining AIs after the player then auto-decide
+//   via a RESOLVE_BUY_TAIL action
+// - If player discarded, they are excluded entirely (can't buy own discard)
 function resolveAfterDiscard(state, activeTurn, discardedCard){
   const nt = nextTurn(activeTurn);
   const eligible = buyEligible(activeTurn, state.metContract, state.buysUsed);
   const discardLabel = discardedCard.isJoker?"Joker":discardedCard.rank+discardedCard.suit;
 
-  // AI players in eligible decide immediately
   let hands = [...state.hands];
   let deck = [...state.deck];
   let buysUsed = [...state.buysUsed];
-  let bought = false;
 
-  for(const t of eligible){
-    if(t==="player") continue;
+  // Split eligible into: those before player (clockwise) and those after
+  const playerIdx = eligible.indexOf("player");
+  const beforePlayer = playerIdx === -1 ? eligible : eligible.slice(0, playerIdx);
+  const afterPlayer  = playerIdx === -1 ? [] : eligible.slice(playerIdx + 1);
+
+  // AIs before the player auto-decide first
+  for(const t of beforePlayer){
     const bi = pIdx(t);
     if(aiBuyDecision(hands[bi], discardedCard, buysUsed[bi], state.metContract[bi])){
-      // This AI buys
       const penalty = deck.length>0 ? deck[deck.length-1] : null;
       deck = penalty ? deck.slice(0,-1) : deck;
       hands = hands.map((h,i)=>i===bi?[...h,discardedCard,...(penalty?[penalty]:[])]:h);
       buysUsed = buysUsed.map((b,i)=>i===bi?b+1:b);
-      // Active player gets a compensation draw from deck
-      if(deck.length>0){
-        const comp = deck.pop();
-        hands = hands.map((h,i)=>i===pIdx(activeTurn)?[...h,comp]:h);
-      }
-      bought = true;
-      // After AI buys, no more buying for this discard
+      if(deck.length>0){ const comp=deck.pop(); hands=hands.map((h,i)=>i===pIdx(activeTurn)?[...h,comp]:h); }
+      const logEntry = `${turnName(t)} bought ${discardLabel}`;
       return{...state,hands,deck,buysUsed,
         turn:nt,phase:"draw",aiTurnPending:nt!=="player",
         buyWindow:false,buyWindowCard:null,buyWindowFor:null,buyWindowNext:null,
+        actionLog:[logEntry,...(state.actionLog||[])].slice(0,6),
         message:`${turnName(t)} bought ${discardLabel}! ${nt==="player"?"Your turn — draw.":turnName(nt)+"'s turn…"}`};
     }
   }
 
-  // No AI bought — if player is eligible (an AI discarded), show buy window
-  if(eligible.includes("player")){
+  // Player's turn to decide (if eligible)
+  if(playerIdx !== -1){
     return{...state,hands,deck,buysUsed,
-      buyWindow:true,buyWindowCard:discardedCard,buyWindowFor:activeTurn,buyWindowNext:nt,
+      buyWindow:true,
+      buyWindowCard:discardedCard,
+      buyWindowFor:activeTurn,
+      buyWindowNext:nt,
+      buyWindowTail:afterPlayer, // AIs still to decide after player passes
       aiTurnPending:false,
       message:`${turnName(activeTurn)} discarded ${discardLabel}. Buy it? (+1 penalty card)`};
+  }
+
+  // No player in eligible — let remaining AIs (afterPlayer = all eligible) decide
+  for(const t of eligible){
+    const bi = pIdx(t);
+    if(aiBuyDecision(hands[bi], discardedCard, buysUsed[bi], state.metContract[bi])){
+      const penalty = deck.length>0 ? deck[deck.length-1] : null;
+      deck = penalty ? deck.slice(0,-1) : deck;
+      hands = hands.map((h,i)=>i===bi?[...h,discardedCard,...(penalty?[penalty]:[])]:h);
+      buysUsed = buysUsed.map((b,i)=>i===bi?b+1:b);
+      if(deck.length>0){ const comp=deck.pop(); hands=hands.map((h,i)=>i===pIdx(activeTurn)?[...h,comp]:h); }
+      const logEntry = `${turnName(t)} bought ${discardLabel}`;
+      return{...state,hands,deck,buysUsed,
+        turn:nt,phase:"draw",aiTurnPending:nt!=="player",
+        buyWindow:false,buyWindowCard:null,buyWindowFor:null,buyWindowNext:null,
+        actionLog:[logEntry,...(state.actionLog||[])].slice(0,6),
+        message:`${turnName(t)} bought ${discardLabel}! ${nt==="player"?"Your turn — draw.":turnName(nt)+"'s turn…"}`};
+    }
   }
 
   // Nobody buys — advance turn
@@ -429,18 +456,44 @@ function reducer(state,action){
         const ai=pIdx(state.buyWindowFor);
         handsFinal=handsFinal.map((h,i)=>i===ai?[...h,comp]:h);
       }
+      const boughtLabel = card.isJoker?"Joker":card.rank+card.suit;
       return{...state,hands:handsFinal,deck:deckFinal,buysUsed,
-        buyWindow:false,buyWindowCard:null,buyWindowFor:null,buyWindowNext:null,
+        buyWindow:false,buyWindowCard:null,buyWindowFor:null,buyWindowNext:null,buyWindowTail:[],
         turn:nt,phase:"draw",aiTurnPending:nt!=="player",
-        message:`You bought ${card.isJoker?"Joker":card.rank+card.suit}! +1 penalty card.`};
+        actionLog:[`You bought ${boughtLabel}`,...(state.actionLog||[])].slice(0,6),
+        message:`You bought ${boughtLabel}! +1 penalty card.`};
     }
 
-    // Skip buying — close window and advance turn
+    // Skip buying — resolve remaining tail AIs then advance turn
     case "PASS_BUY":{
       if(!state.buyWindow) return state;
       const nt=state.buyWindowNext;
-      return{...state,
-        buyWindow:false,buyWindowCard:null,buyWindowFor:null,buyWindowNext:null,
+      const tail=state.buyWindowTail||[];
+      const discardedCard=state.buyWindowCard;
+      const activeTurn=state.buyWindowFor;
+      const discardLabel=discardedCard.isJoker?"Joker":discardedCard.rank+discardedCard.suit;
+      let hands=[...state.hands];
+      let deck=[...state.deck];
+      let buysUsed=[...state.buysUsed];
+      for(const t of tail){
+        const bi=pIdx(t);
+        if(aiBuyDecision(hands[bi],discardedCard,buysUsed[bi],state.metContract[bi])){
+          const penalty=deck.length>0?deck[deck.length-1]:null;
+          deck=penalty?deck.slice(0,-1):deck;
+          hands=hands.map((h,i)=>i===bi?[...h,discardedCard,...(penalty?[penalty]:[])]:h);
+          buysUsed=buysUsed.map((b,i)=>i===bi?b+1:b);
+          if(deck.length>0){ const comp=deck.pop(); hands=hands.map((h,i)=>i===pIdx(activeTurn)?[...h,comp]:h); }
+          const logEntry=`${turnName(t)} bought ${discardLabel}`;
+          return{...state,hands,deck,buysUsed,
+            turn:nt,phase:"draw",aiTurnPending:nt!=="player",
+            buyWindow:false,buyWindowCard:null,buyWindowFor:null,buyWindowNext:null,buyWindowTail:[],
+            actionLog:[logEntry,...(state.actionLog||[])].slice(0,6),
+            message:`${turnName(t)} bought ${discardLabel}! ${nt==="player"?"Your turn — draw.":turnName(nt)+"'s turn…"}`};
+        }
+      }
+      // Nobody in tail buys either
+      return{...state,hands,deck,buysUsed,
+        buyWindow:false,buyWindowCard:null,buyWindowFor:null,buyWindowNext:null,buyWindowTail:[],
         turn:nt,phase:"draw",aiTurnPending:nt!=="player",
         message:nt==="player"?"Your turn — draw a card.":`${turnName(nt)}'s turn…`};
     }
@@ -486,8 +539,11 @@ function reducer(state,action){
       if(hand.length===0&&metC[pi])
         return endRound({...state,hands,melds,metContract:metC},cur,hands,discard);
 
+      const discardLogLabel = discard.isJoker?"Joker":discard.rank+discard.suit;
+      const discardLogEntry = `${turnName(cur)} discarded ${discardLogLabel}`;
       return resolveAfterDiscard(
-        {...state,hands,deck,discardPile:dp,melds,metContract:metC,selectedCards:[],stagingGroups:[]},
+        {...state,hands,deck,discardPile:dp,melds,metContract:metC,selectedCards:[],stagingGroups:[],
+         actionLog:[discardLogEntry,...(state.actionLog||[])].slice(0,6)},
         cur, discard
       );
     }
@@ -731,10 +787,18 @@ export default function ContractRummy(){
 
   useEffect(()=>{
     if(state.aiTurnPending&&!state.roundOver){
-      const t=setTimeout(()=>dispatch({type:"AI_TURN"}),800);
+      const t=setTimeout(()=>dispatch({type:"AI_TURN"}),1400);
       return()=>clearTimeout(t);
     }
   },[state.aiTurnPending,state.roundOver,state.turn,state.phase]);
+
+  // Auto-pass buy window after 8 seconds
+  useEffect(()=>{
+    if(state.buyWindow){
+      const t=setTimeout(()=>dispatch({type:"PASS_BUY"}),8000);
+      return()=>clearTimeout(t);
+    }
+  },[state.buyWindow]);
 
   const topDiscard=state.discardPile[state.discardPile.length-1];
   const isPlayer=state.turn==="player";
@@ -908,6 +972,21 @@ export default function ContractRummy(){
                       canLayoff={canLayoff} layoffCard={canLayoff?state.hands[0].find(c=>c.id===state.selectedCards[0]):null}/>
                   </div>
                 )
+              ))}
+            </div>
+          )}
+
+          {/* Action log */}
+          {(state.actionLog||[]).length>0&&(
+            <div style={{borderTop:"1px solid rgba(255,255,255,0.05)",paddingTop:5,marginTop:4}}>
+              {(state.actionLog||[]).map((entry,i)=>(
+                <div key={i} style={{
+                  fontSize:9,color:i===0?"#c8dfc0":"#4a6a58",
+                  fontStyle:"italic",lineHeight:1.6,
+                  opacity:Math.max(0.2, 1-(i*0.2)),
+                }}>
+                  {i===0?"›":""} {entry}
+                </div>
               ))}
             </div>
           )}
