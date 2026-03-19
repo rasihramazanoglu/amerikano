@@ -544,6 +544,11 @@ function Card({card,selected,staged,onClick,faceDown,small,draggable,onDragStart
         fontSize:isJoker?30:46,color,lineHeight:1}}>
         {isJoker?"★":card.suit}
       </div>
+      {/* Bottom-right: rank only, rotated 180° */}
+      <div style={{position:"absolute",bottom:3,right:4,fontSize:15,fontWeight:800,
+        color,fontFamily:"Georgia,serif",lineHeight:1,transform:"rotate(180deg)"}}>
+        {isJoker?"JK":card.rank}
+      </div>
 
     </div>
   );
