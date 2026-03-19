@@ -184,6 +184,61 @@ function endRound(state,winnerTurn,hands,lastDiscard){
     message:`${turnName(winnerTurn)} went out! Round over.`,winnerName};
 }
 
+// ── Post-discard buy resolution ──────────────────────────────────────────────
+// After any discard: AI players decide to buy immediately (clockwise).
+// If player is eligible (i.e. an AI discarded), open the buy window for them.
+// If player discarded, AIs auto-decide, then turn advances — player can't buy own discard.
+function resolveAfterDiscard(state, activeTurn, discardedCard){
+  const nt = nextTurn(activeTurn);
+  const eligible = buyEligible(activeTurn, state.metContract, state.buysUsed);
+  const discardLabel = discardedCard.isJoker?"Joker":discardedCard.rank+discardedCard.suit;
+
+  // AI players in eligible decide immediately
+  let hands = [...state.hands];
+  let deck = [...state.deck];
+  let buysUsed = [...state.buysUsed];
+  let bought = false;
+
+  for(const t of eligible){
+    if(t==="player") continue;
+    const bi = pIdx(t);
+    if(aiBuyDecision(hands[bi], discardedCard, buysUsed[bi], state.metContract[bi])){
+      // This AI buys
+      const penalty = deck.length>0 ? deck[deck.length-1] : null;
+      deck = penalty ? deck.slice(0,-1) : deck;
+      hands = hands.map((h,i)=>i===bi?[...h,discardedCard,...(penalty?[penalty]:[])]:h);
+      buysUsed = buysUsed.map((b,i)=>i===bi?b+1:b);
+      // Active player gets a compensation draw from deck
+      if(deck.length>0){
+        const comp = deck.pop();
+        hands = hands.map((h,i)=>i===pIdx(activeTurn)?[...h,comp]:h);
+      }
+      bought = true;
+      // After AI buys, no more buying for this discard
+      return{...state,hands,deck,buysUsed,
+        turn:nt,phase:"draw",aiTurnPending:nt!=="player",
+        buyWindow:false,buyWindowCard:null,buyWindowFor:null,buyWindowNext:null,
+        message:`${turnName(t)} bought ${discardLabel}! ${nt==="player"?"Your turn — draw.":turnName(nt)+"'s turn…"}`};
+    }
+  }
+
+  // No AI bought — if player is eligible (an AI discarded), show buy window
+  if(eligible.includes("player")){
+    return{...state,hands,deck,buysUsed,
+      buyWindow:true,buyWindowCard:discardedCard,buyWindowFor:activeTurn,buyWindowNext:nt,
+      aiTurnPending:false,
+      message:`${turnName(activeTurn)} discarded ${discardLabel}. Buy it? (+1 penalty card)`};
+  }
+
+  // Nobody buys — advance turn
+  return{...state,hands,deck,buysUsed,
+    turn:nt,phase:"draw",aiTurnPending:nt!=="player",
+    buyWindow:false,buyWindowCard:null,buyWindowFor:null,buyWindowNext:null,
+    message:nt==="player"
+      ?`${turnName(activeTurn)} discarded ${discardLabel}. Your turn — draw.`
+      :`${turnName(nt)}'s turn…`};
+}
+
 // ── Reducer ───────────────────────────────────────────────────────────────────
 function reducer(state,action){
   switch(action.type){
@@ -336,11 +391,8 @@ function reducer(state,action){
       const hands=state.hands.map((h,i)=>i===0?h.filter(c=>c.id!==cid):h);
       if(hands[0].length===0&&state.metContract[0])
         return endRound(state,"player",hands,card);
-      const nt=nextTurn("player");
-      return{...state,hands,discardPile:[...state.discardPile,card],
-        selectedCards:[],stagingGroups:[],
-        turn:nt,phase:"draw",aiTurnPending:nt!=="player",
-        message:nt==="player"?"Your turn — draw a card.":`${turnName(nt)}'s turn…`};
+      return resolveAfterDiscard({...state,hands,discardPile:[...state.discardPile,card],
+        selectedCards:[],stagingGroups:[]},"player",card);
     }
 
     case "DISCARD":{
@@ -353,19 +405,8 @@ function reducer(state,action){
       const hands=state.hands.map((h,i)=>i===0?h.filter(c=>c.id!==cid):h);
       if(hands[0].length===0&&state.metContract[0])
         return endRound(state,"player",hands,card);
-      const nt=nextTurn("player");
-      const eligible=buyEligible("player",state.metContract,state.buysUsed);
-      if(eligible.length>0){
-        return{...state,hands,discardPile:[...state.discardPile,card],
-          selectedCards:[],stagingGroups:[],
-          buyWindow:true,buyWindowCard:card,buyWindowFor:"player",buyWindowNext:nt,
-          aiTurnPending:false,
-          message:`Any player want to buy ${card.isJoker?"Joker":card.rank+card.suit}?`};
-      }
-      return{...state,hands,discardPile:[...state.discardPile,card],
-        selectedCards:[],stagingGroups:[],
-        turn:nt,phase:"draw",aiTurnPending:nt!=="player",
-        message:nt==="player"?"Your turn — draw a card.":`${turnName(nt)}'s turn…`};
+      return resolveAfterDiscard({...state,hands,discardPile:[...state.discardPile,card],
+        selectedCards:[],stagingGroups:[]},"player",card);
     }
 
     // Player buys the card in the buy window
@@ -445,59 +486,10 @@ function reducer(state,action){
       if(hand.length===0&&metC[pi])
         return endRound({...state,hands,melds,metContract:metC},cur,hands,discard);
 
-      const nt=nextTurn(cur);
-      const eligible=buyEligible(cur,metC,state.buysUsed);
-      const discardLabel=discard.isJoker?"Joker":discard.rank+discard.suit;
-
-      // Check if any AI in eligible wants to buy
-      let buyerTurn=null;
-      for(const t of eligible){
-        if(t==="player") continue; // player decides via UI
-        const bi=pIdx(t);
-        if(aiBuyDecision(hands[bi],discard,state.buysUsed[bi],metC[bi])){
-          buyerTurn=t; break;
-        }
-      }
-
-      if(buyerTurn){
-        // AI buys immediately
-        const bi=pIdx(buyerTurn);
-        const penalty=deck.length>0?deck[deck.length-1]:null;
-        const deckAfter=penalty?deck.slice(0,-1):deck;
-        const handsAfter=hands.map((h,i)=>i===bi?[...h,discard,...(penalty?[penalty]:[])]:h);
-        // active player gets comp draw
-        let deckFinal=[...deckAfter];
-        let handsFinal=[...handsAfter];
-        if(deckFinal.length>0){
-          const comp=deckFinal.pop();
-          handsFinal=handsFinal.map((h,i)=>i===pi?[...h,comp]:h);
-        }
-        const buysUsed=state.buysUsed.map((b,i)=>i===bi?b+1:b);
-        // open buy window for player if player is also eligible and hasn't decided
-        const playerEligible=eligible.includes("player");
-        if(playerEligible){
-          // show window briefly so player can see, but AI already bought — just advance
-        }
-        return{...state,hands:handsFinal,deck:deckFinal,melds,metContract:metC,buysUsed,
-          discardPile:dp,
-          turn:nt,phase:"draw",selectedCards:[],stagingGroups:[],aiTurnPending:nt!=="player",
-          message:`${turnName(buyerTurn)} bought ${discardLabel}! ${nt==="player"?"Your turn — draw.":turnName(nt)+"'s turn…"}`};
-      }
-
-      // No AI wants to buy — open window if player is eligible, else advance
-      if(eligible.includes("player")){
-        return{...state,hands,deck,discardPile:dp,melds,metContract:metC,
-          selectedCards:[],stagingGroups:[],
-          buyWindow:true,buyWindowCard:discard,buyWindowFor:cur,buyWindowNext:nt,
-          aiTurnPending:false,
-          message:`${turnName(cur)} discarded ${discardLabel}. Buy it? (+1 penalty card)`};
-      }
-
-      return{...state,hands,deck,discardPile:dp,melds,metContract:metC,
-        turn:nt,phase:"draw",selectedCards:[],stagingGroups:[],aiTurnPending:nt!=="player",
-        message:nt==="player"
-          ?`${turnName(cur)} discarded ${discardLabel}. Your turn — draw.`
-          :`${turnName(nt)}'s turn…`};
+      return resolveAfterDiscard(
+        {...state,hands,deck,discardPile:dp,melds,metContract:metC,selectedCards:[],stagingGroups:[]},
+        cur, discard
+      );
     }
 
     case "NEXT_ROUND":
