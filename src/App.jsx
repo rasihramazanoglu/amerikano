@@ -525,7 +525,7 @@ function Card({card,selected,staged,onClick,faceDown,small,draggable,onDragStart
   let border="1.5px solid #c8bfaa";
   let shadow="0 2px 6px rgba(0,0,0,0.35)";
   let ty=0;
-  if(selected){bg="linear-gradient(160deg,#fffbe6,#fff3b0)";border="2px solid #d4a017";shadow="0 0 0 2px #d4a017,0 6px 18px rgba(0,0,0,0.6)";ty=-11;}
+  if(selected){bg="linear-gradient(160deg,#fffbe6,#fff3b0)";border="2px solid #d4a017";shadow="0 0 0 2px #d4a017,0 6px 18px rgba(0,0,0,0.6)";ty=-18;}
   else if(staged){bg="linear-gradient(160deg,#e8f4ff,#d0e8ff)";border="2px solid #4a90d9";shadow="0 0 0 1px #4a90d9,0 4px 10px rgba(0,0,0,0.4)";ty=-6;}
   return(
     <div draggable={draggable} onDragStart={onDragStart} onDragOver={onDragOver} onDragEnd={onDragEnd}
@@ -916,9 +916,10 @@ export default function ContractRummy(){
           </div>
         </div>
 
-        {/* Card row */}
-        <div style={{overflowX:"auto",WebkitOverflowScrolling:"touch",paddingBottom:8}}>
-          <div style={{display:"flex",gap:5,width:"max-content"}}>
+        {/* Card row — clips top of rising selected cards */}
+        <div style={{overflow:"hidden",borderRadius:"8px 8px 0 0",marginTop:4}}>  
+        <div style={{overflowX:"auto",WebkitOverflowScrolling:"touch",paddingBottom:8,paddingTop:20}}>
+          <div style={{display:"flex",gap:5,width:"max-content",margin:"0 auto"}}>
             {state.hands[0].map((card,i)=>{
               const isStaged=stagedIds.has(card.id);
               const isSelected=state.selectedCards.includes(card.id);
@@ -937,6 +938,7 @@ export default function ContractRummy(){
               );
             })}
           </div>
+        </div>
         </div>
         <div style={{fontSize:8,color:"#3a6a4a",fontStyle:"italic",marginTop:2}}>
           {alreadyDown
