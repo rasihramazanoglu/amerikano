@@ -619,41 +619,62 @@ function MeldZone({melds,ownerTurn,onLayoff,canLayoff}){
 
 // ── Opponent panel (top / left / right) ──────────────────────────────────────
 function OpponentPanel({name,hand,metContract,isTurn,buysUsed,position}){
-  // position: "top" | "left" | "right"
   const isVertical = position==="left"||position==="right";
   const accent = isTurn?"#d4a017":"#7ab88a";
+  const buysLeft = 3-buysUsed;
   return(
     <div style={{
-      display:"flex",
-      flexDirection: isVertical ? "column" : "row",
-      alignItems:"center",
-      gap:6,
+      display:"flex",flexDirection:"column",
+      alignItems:"center",justifyContent:"center",
+      gap:8,
       background:isTurn?"rgba(212,160,23,0.07)":"rgba(0,0,0,0.22)",
       border:`1px solid ${isTurn?"rgba(212,160,23,0.45)":"rgba(255,255,255,0.07)"}`,
-      borderRadius:10,
-      padding: isVertical ? "8px 6px" : "6px 10px",
-      width: isVertical ? 72 : "100%",
-      minHeight: isVertical ? undefined : 52,
+      borderRadius:10,padding:"10px 8px",
+      width: isVertical ? 96 : "100%",
+      minHeight: isVertical ? 200 : undefined,
     }}>
-      {/* Name + info */}
-      <div style={{textAlign:"center",flexShrink:0,minWidth:isVertical?undefined:50}}>
-        <div style={{fontSize:9,fontWeight:700,color:accent,
-          letterSpacing:0.5,textTransform:"uppercase",lineHeight:1}}>{name}</div>
-        <div style={{fontSize:8,color:"#4a7060",marginTop:2}}>{hand.length}🃏</div>
-        {metContract&&<div style={{fontSize:7,color:"#d4a017",marginTop:1}}>✓DOWN</div>}
-        <div style={{fontSize:7,color:"#4a7060",marginTop:1}}>B:{buysUsed}/3</div>
-      </div>
-      {/* Face-down cards — vertical for side players, horizontal for top */}
-      <div style={{
-        display:"flex",
-        flexDirection: isVertical ? "column" : "row",
-        gap:2,
-        overflow:"hidden",
-        flex: isVertical ? undefined : 1,
-      }}>
-        {hand.map(c=><Card key={c.id} card={c} faceDown small={isVertical}/>)}
+      {/* Name */}
+      <div style={{textAlign:"center"}}>
+        <div style={{fontSize:11,fontWeight:700,color:accent,
+          letterSpacing:1,textTransform:"uppercase"}}>
+          {name}
+        </div>
+        {metContract&&<div style={{fontSize:8,color:"#d4a017",marginTop:1,letterSpacing:1}}>✓ DOWN</div>}
+        {isTurn&&!metContract&&<div style={{fontSize:8,color:"#d4a017",marginTop:1,letterSpacing:1}}>TURN</div>}
       </div>
 
+      {/* Stack card showing card count */}
+      <div style={{position:"relative",width:CW+8,height:CH+8,flexShrink:0}}>
+        <div style={{position:"absolute",top:6,left:6,width:CW,height:CH,borderRadius:6,
+          background:"linear-gradient(135deg,#0a1e12,#050f08)",border:"1px solid #152d1e"}}/>
+        <div style={{position:"absolute",top:3,left:3,width:CW,height:CH,borderRadius:6,
+          background:"linear-gradient(135deg,#0d2318,#071a0f)",border:"1px solid #1a4028"}}/>
+        <div style={{position:"absolute",top:0,left:0,width:CW,height:CH,borderRadius:6,
+          background:"linear-gradient(135deg,#1a4a2e,#0d2e1a)",
+          border:`2px solid ${isTurn?"#d4a017":"#2a6042"}`,
+          display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",
+          boxShadow:isTurn?"0 0 10px rgba(212,160,23,0.35)":"0 3px 10px rgba(0,0,0,0.5)",
+        }}>
+          <div style={{fontSize:28,fontWeight:800,color:isTurn?"#d4a017":"#4a9060",
+            fontFamily:"Georgia,serif",lineHeight:1}}>
+            {hand.length}
+          </div>
+          <div style={{fontSize:8,color:"#3a7050",letterSpacing:1,textTransform:"uppercase",marginTop:3}}>
+            cards
+          </div>
+        </div>
+      </div>
+
+      {/* Buys remaining */}
+      <div style={{textAlign:"center"}}>
+        <div style={{fontSize:22,fontWeight:800,lineHeight:1,fontFamily:"Georgia,serif",
+          color:buysLeft===0?"#5a3a3a":buysLeft===1?"#c06030":"#4a9060"}}>
+          {buysLeft}
+        </div>
+        <div style={{fontSize:7,color:"#3a6050",letterSpacing:1,textTransform:"uppercase",marginTop:2}}>
+          buys left
+        </div>
+      </div>
     </div>
   );
 }
@@ -723,9 +744,9 @@ export default function ContractRummy(){
 
   // ── Table layout helpers ──
   const sharedPanelProps = (ai,pos) => ({
-    key:ai, name:AI_NAMES[ai], hand:state.hands[ai+1], melds:state.melds[ai+1],
+    key:ai, name:AI_NAMES[ai], hand:state.hands[ai+1],
     metContract:state.metContract[ai+1], isTurn:state.turn===`ai${ai}`,
-    canLayoff, onLayoff, ownerTurn:`ai${ai}`, buysUsed:state.buysUsed[ai+1], position:pos,
+    buysUsed:state.buysUsed[ai+1], position:pos,
   });
 
   return(
