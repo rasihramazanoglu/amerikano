@@ -721,7 +721,7 @@ export default function ContractRummy(){
   const[state,dispatch]=useReducer(reducer,undefined,initialState);
   const drag=useDragReorder(dispatch);
   const contract=CONTRACTS[state.roundIndex];
-  const [draggingCardId, setDraggingCardId] = useState(null);
+  const draggingCardId = useRef(null);
   const [discardHover, setDiscardHover] = useState(false);
 
   useEffect(()=>{
@@ -824,10 +824,26 @@ export default function ContractRummy(){
         {/* Marco — LEFT */}
         <OpponentPanel {...sharedPanelProps(1,"left")}/>
 
-        {/* ── Table center ── */}
-        <div style={{flex:1,display:"flex",flexDirection:"column",gap:6,
-          background:"rgba(0,0,0,0.15)",borderRadius:12,padding:"8px 10px",
-          border:"1px solid rgba(255,255,255,0.05)"}}>
+        {/* ── Table center — also a discard drop zone ── */}
+        <div
+          onDragOver={(e)=>{ e.preventDefault(); if(draggingCardId.current&&canMeld) setDiscardHover(true); }}
+          onDragLeave={(e)=>{ if(!e.currentTarget.contains(e.relatedTarget)) setDiscardHover(false); }}
+          onDrop={(e)=>{
+            e.preventDefault();
+            const cid = draggingCardId.current || e.dataTransfer.getData('cardId');
+            if(cid&&canMeld&&!state.stagingGroups.flat().includes(cid)){
+              dispatch({type:"DISCARD_BY_ID",id:cid});
+            }
+            setDiscardHover(false);
+            draggingCardId.current=null;
+          }}
+          style={{flex:1,display:"flex",flexDirection:"column",gap:6,
+            background:discardHover?"rgba(176,80,32,0.12)":"rgba(0,0,0,0.15)",
+            borderRadius:12,padding:"8px 10px",
+            border:discardHover?"2px dashed #b05020":"1px solid rgba(255,255,255,0.05)",
+            boxShadow:discardHover?"0 0 20px rgba(176,80,32,0.25)":"none",
+            transition:"background 0.15s,border 0.15s,box-shadow 0.15s",
+          }}>
 
           {/* Deck + Discard */}
           <div style={{display:"flex",justifyContent:"center",alignItems:"flex-end",gap:14}}>
@@ -839,41 +855,27 @@ export default function ContractRummy(){
               <div style={{fontSize:7,color:"#6aaa7a",marginTop:2,letterSpacing:1}}>DECK·{state.deck.length}</div>
             </div>
             <div style={{textAlign:"center"}}>
-              <div
-                onDragOver={(e)=>{ e.preventDefault(); if(draggingCardId&&canMeld) setDiscardHover(true); }}
-                onDragLeave={()=>setDiscardHover(false)}
-                onDrop={(e)=>{
-                  e.preventDefault();
-                  if(draggingCardId&&canMeld&&!state.stagingGroups.flat().includes(draggingCardId)){
-                    dispatch({type:"DISCARD_BY_ID",id:draggingCardId});
-                  }
-                  setDiscardHover(false);
-                  setDraggingCardId(null);
-                }}
-                style={{
-                  display:"inline-block",borderRadius:8,padding:2,
-                  outline: discardHover?"3px dashed #b05020":"3px solid transparent",
-                  boxShadow: discardHover?"0 0 14px rgba(176,80,32,0.6)":"none",
-                  transition:"box-shadow 0.15s,outline 0.15s",
-                }}>
-                {topDiscard
-                  ?<div onClick={canDraw?()=>dispatch({type:"DRAW_DISCARD"}):undefined}
-                     style={{opacity:canDraw?1:discardHover?1:0.35,cursor:canDraw?"pointer":"default"}}>
-                     <Card card={topDiscard}/>
-                   </div>
-                  :<div style={{width:CW,height:CH,borderRadius:6,
-                     border:"1.5px dashed rgba(255,255,255,0.12)",
-                     display:"flex",alignItems:"center",justifyContent:"center",
-                     color:"rgba(255,255,255,0.15)",fontSize:16}}>∅</div>
-                }
-              </div>
-              <div style={{fontSize:7,color:discardHover?"#b05020":"#6aaa7a",marginTop:2,letterSpacing:1,
-                fontWeight:discardHover?700:400,transition:"color 0.15s"}}>
-                {discardHover?"DROP TO DISCARD":"DISCARD"}
-              </div>
+              {topDiscard
+                ?<div onClick={canDraw?()=>dispatch({type:"DRAW_DISCARD"}):undefined}
+                   style={{opacity:canDraw?1:0.35,cursor:canDraw?"pointer":"default"}}>
+                   <Card card={topDiscard}/>
+                 </div>
+                :<div style={{width:CW,height:CH,borderRadius:6,
+                   border:"1.5px dashed rgba(255,255,255,0.12)",
+                   display:"flex",alignItems:"center",justifyContent:"center",
+                   color:"rgba(255,255,255,0.15)",fontSize:16}}>∅</div>
+              }
+              <div style={{fontSize:7,color:"#6aaa7a",marginTop:2,letterSpacing:1}}>DISCARD</div>
             </div>
           </div>
 
+          {/* Drop hint */}
+          {discardHover&&canMeld&&(
+            <div style={{textAlign:"center",fontSize:11,color:"#b05020",fontWeight:700,
+              letterSpacing:1,textTransform:"uppercase",animation:"pulse 0.8s infinite"}}>
+              ↓ Drop to Discard
+            </div>
+          )}
           {/* Turn indicator + message */}
           <div style={{textAlign:"center"}}>
             <div style={{display:"inline-block",padding:"2px 8px",borderRadius:4,marginBottom:3,
@@ -972,9 +974,9 @@ export default function ContractRummy(){
                     else if(canMeld&&!isStaged) dispatch({type:"TOGGLE_CARD",id:card.id});
                   }}
                   draggable={!isStaged}
-                  onDragStart={!isStaged?()=>{ drag.onDragStart(i); setDraggingCardId(card.id); }:undefined}
+                  onDragStart={!isStaged?(e)=>{ drag.onDragStart(i); draggingCardId.current=card.id; e.dataTransfer.setData('cardId',card.id); }:undefined}
                   onDragOver={!isStaged?(e)=>drag.onDragOver(e,i):undefined}
-                  onDragEnd={!isStaged?()=>{ drag.onDragEnd(); setDraggingCardId(null); setDiscardHover(false); }:undefined}
+                  onDragEnd={!isStaged?()=>{ drag.onDragEnd(); draggingCardId.current=null; setDiscardHover(false); }:undefined}
                 />
               );
             })}
