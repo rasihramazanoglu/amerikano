@@ -1,4 +1,4 @@
-import { useReducer, useEffect, useRef } from "react";
+import React, { useReducer, useEffect, useRef, useState } from "react";
 
 // ── Constants ────────────────────────────────────────────────────────────────
 const SUITS = ["♠","♥","♦","♣"];
@@ -324,6 +324,23 @@ function reducer(state,action){
       if(hands[0].length===0)
         return endRound({...state,hands,melds:newMelds},"player",hands,null);
       return{...state,melds:newMelds,hands,selectedCards:[],message:"Laid off!"};
+    }
+
+    case "DISCARD_BY_ID":{
+      if(state.turn!=="player"||state.phase!=="meld") return state;
+      const cid=action.id;
+      if(state.stagingGroups.flat().includes(cid))
+        return{...state,message:"That card is staged — disband the group first."};
+      const card=state.hands[0].find(c=>c.id===cid);
+      if(!card) return state;
+      const hands=state.hands.map((h,i)=>i===0?h.filter(c=>c.id!==cid):h);
+      if(hands[0].length===0&&state.metContract[0])
+        return endRound(state,"player",hands,card);
+      const nt=nextTurn("player");
+      return{...state,hands,discardPile:[...state.discardPile,card],
+        selectedCards:[],stagingGroups:[],
+        turn:nt,phase:"draw",aiTurnPending:nt!=="player",
+        message:nt==="player"?"Your turn — draw a card.":`${turnName(nt)}'s turn…`};
     }
 
     case "DISCARD":{
@@ -704,6 +721,8 @@ export default function ContractRummy(){
   const[state,dispatch]=useReducer(reducer,undefined,initialState);
   const drag=useDragReorder(dispatch);
   const contract=CONTRACTS[state.roundIndex];
+  const [draggingCardId, setDraggingCardId] = useState(null);
+  const [discardHover, setDiscardHover] = useState(false);
 
   useEffect(()=>{
     if(state.aiTurnPending&&!state.roundOver){
@@ -820,17 +839,38 @@ export default function ContractRummy(){
               <div style={{fontSize:7,color:"#6aaa7a",marginTop:2,letterSpacing:1}}>DECK·{state.deck.length}</div>
             </div>
             <div style={{textAlign:"center"}}>
-              {topDiscard
-                ?<div onClick={canDraw?()=>dispatch({type:"DRAW_DISCARD"}):undefined}
-                   style={{opacity:canDraw?1:0.35,cursor:canDraw?"pointer":"default"}}>
-                   <Card card={topDiscard}/>
-                 </div>
-                :<div style={{width:CW,height:CH,borderRadius:6,
-                   border:"1.5px dashed rgba(255,255,255,0.12)",
-                   display:"flex",alignItems:"center",justifyContent:"center",
-                   color:"rgba(255,255,255,0.15)",fontSize:16}}>∅</div>
-              }
-              <div style={{fontSize:7,color:"#6aaa7a",marginTop:2,letterSpacing:1}}>DISCARD</div>
+              <div
+                onDragOver={(e)=>{ e.preventDefault(); if(draggingCardId&&canMeld) setDiscardHover(true); }}
+                onDragLeave={()=>setDiscardHover(false)}
+                onDrop={(e)=>{
+                  e.preventDefault();
+                  if(draggingCardId&&canMeld&&!state.stagingGroups.flat().includes(draggingCardId)){
+                    dispatch({type:"DISCARD_BY_ID",id:draggingCardId});
+                  }
+                  setDiscardHover(false);
+                  setDraggingCardId(null);
+                }}
+                style={{
+                  display:"inline-block",borderRadius:8,padding:2,
+                  outline: discardHover?"3px dashed #b05020":"3px solid transparent",
+                  boxShadow: discardHover?"0 0 14px rgba(176,80,32,0.6)":"none",
+                  transition:"box-shadow 0.15s,outline 0.15s",
+                }}>
+                {topDiscard
+                  ?<div onClick={canDraw?()=>dispatch({type:"DRAW_DISCARD"}):undefined}
+                     style={{opacity:canDraw?1:discardHover?1:0.35,cursor:canDraw?"pointer":"default"}}>
+                     <Card card={topDiscard}/>
+                   </div>
+                  :<div style={{width:CW,height:CH,borderRadius:6,
+                     border:"1.5px dashed rgba(255,255,255,0.12)",
+                     display:"flex",alignItems:"center",justifyContent:"center",
+                     color:"rgba(255,255,255,0.15)",fontSize:16}}>∅</div>
+                }
+              </div>
+              <div style={{fontSize:7,color:discardHover?"#b05020":"#6aaa7a",marginTop:2,letterSpacing:1,
+                fontWeight:discardHover?700:400,transition:"color 0.15s"}}>
+                {discardHover?"DROP TO DISCARD":"DISCARD"}
+              </div>
             </div>
           </div>
 
@@ -932,9 +972,9 @@ export default function ContractRummy(){
                     else if(canMeld&&!isStaged) dispatch({type:"TOGGLE_CARD",id:card.id});
                   }}
                   draggable={!isStaged}
-                  onDragStart={!isStaged?()=>drag.onDragStart(i):undefined}
+                  onDragStart={!isStaged?()=>{ drag.onDragStart(i); setDraggingCardId(card.id); }:undefined}
                   onDragOver={!isStaged?(e)=>drag.onDragOver(e,i):undefined}
-                  onDragEnd={!isStaged?drag.onDragEnd:undefined}
+                  onDragEnd={!isStaged?()=>{ drag.onDragEnd(); setDraggingCardId(null); setDiscardHover(false); }:undefined}
                 />
               );
             })}
