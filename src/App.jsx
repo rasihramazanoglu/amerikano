@@ -509,12 +509,14 @@ function useDragReorder(dispatch){
 
 // ── Card ──────────────────────────────────────────────────────────────────────
 const CW=46,CH=68;
-function Card({card,selected,staged,onClick,faceDown,draggable,onDragStart,onDragOver,onDragEnd}){
+function Card({card,selected,staged,onClick,faceDown,small,draggable,onDragStart,onDragOver,onDragEnd}){
+  const w = small ? 20 : CW;
+  const h = small ? 30 : CH;
   if(faceDown) return(
-    <div style={{width:CW,height:CH,borderRadius:6,flexShrink:0,
+    <div style={{width:w,height:h,borderRadius:4,flexShrink:0,
       background:"linear-gradient(135deg,#1a4a2e,#0d2e1a)",
-      border:"1.5px solid #2a6042",display:"flex",alignItems:"center",
-      justifyContent:"center",fontSize:12,color:"#2a6042",userSelect:"none"}}>✦</div>
+      border:"1px solid #2a6042",display:"flex",alignItems:"center",
+      justifyContent:"center",fontSize:8,color:"#2a6042",userSelect:"none"}}>✦</div>
   );
   const isRed=card.suit==="♥"||card.suit==="♦";
   const isJoker=card.isJoker;
@@ -615,28 +617,43 @@ function MeldZone({melds,ownerTurn,onLayoff,canLayoff}){
   );
 }
 
-// ── Opponent row ──────────────────────────────────────────────────────────────
-function OpponentRow({name,hand,melds,metContract,isTurn,onLayoff,canLayoff,ownerTurn,buysUsed}){
+// ── Opponent panel (top / left / right) ──────────────────────────────────────
+function OpponentPanel({name,hand,metContract,isTurn,buysUsed,position}){
+  // position: "top" | "left" | "right"
+  const isVertical = position==="left"||position==="right";
+  const accent = isTurn?"#d4a017":"#7ab88a";
   return(
-    <div style={{display:"flex",alignItems:"center",gap:8,
-      background:isTurn?"rgba(212,160,23,0.07)":"rgba(0,0,0,0.18)",
-      border:`1px solid ${isTurn?"rgba(212,160,23,0.5)":"rgba(255,255,255,0.06)"}`,
-      borderRadius:8,padding:"5px 10px",minHeight:52}}>
-      <div style={{minWidth:46,textAlign:"center",flexShrink:0}}>
-        <div style={{fontSize:10,fontWeight:700,color:isTurn?"#d4a017":"#7ab88a",
+    <div style={{
+      display:"flex",
+      flexDirection: isVertical ? "column" : "row",
+      alignItems:"center",
+      gap:6,
+      background:isTurn?"rgba(212,160,23,0.07)":"rgba(0,0,0,0.22)",
+      border:`1px solid ${isTurn?"rgba(212,160,23,0.45)":"rgba(255,255,255,0.07)"}`,
+      borderRadius:10,
+      padding: isVertical ? "8px 6px" : "6px 10px",
+      width: isVertical ? 72 : "100%",
+      minHeight: isVertical ? undefined : 52,
+    }}>
+      {/* Name + info */}
+      <div style={{textAlign:"center",flexShrink:0,minWidth:isVertical?undefined:50}}>
+        <div style={{fontSize:9,fontWeight:700,color:accent,
           letterSpacing:0.5,textTransform:"uppercase",lineHeight:1}}>{name}</div>
-        <div style={{fontSize:9,color:"#4a7060",marginTop:2}}>{hand.length}🃏</div>
-        {metContract&&<div style={{fontSize:8,color:"#d4a017",marginTop:1}}>✓ DOWN</div>}
-        <div style={{fontSize:8,color:"#4a7060",marginTop:1}}>B:{buysUsed}/3</div>
+        <div style={{fontSize:8,color:"#4a7060",marginTop:2}}>{hand.length}🃏</div>
+        {metContract&&<div style={{fontSize:7,color:"#d4a017",marginTop:1}}>✓DOWN</div>}
+        <div style={{fontSize:7,color:"#4a7060",marginTop:1}}>B:{buysUsed}/3</div>
       </div>
-      <div style={{display:"flex",gap:2,flexShrink:1,overflow:"hidden"}}>
-        {hand.map(c=><Card key={c.id} card={c} faceDown/>)}
+      {/* Face-down cards — vertical for side players, horizontal for top */}
+      <div style={{
+        display:"flex",
+        flexDirection: isVertical ? "column" : "row",
+        gap:2,
+        overflow:"hidden",
+        flex: isVertical ? undefined : 1,
+      }}>
+        {hand.map(c=><Card key={c.id} card={c} faceDown small={isVertical}/>)}
       </div>
-      {melds.length>0&&(
-        <div style={{borderLeft:"1px solid rgba(255,255,255,0.08)",paddingLeft:6,flexShrink:0}}>
-          <MeldZone melds={melds} ownerTurn={ownerTurn} onLayoff={onLayoff} canLayoff={canLayoff}/>
-        </div>
-      )}
+
     </div>
   );
 }
@@ -704,37 +721,46 @@ export default function ContractRummy(){
   const canStage=canMeld&&!alreadyDown&&selIsValidMeld&&
     (wouldBeSet?currentSets<contract.sets:currentRuns<contract.runs);
 
+  // ── Table layout helpers ──
+  const sharedPanelProps = (ai,pos) => ({
+    key:ai, name:AI_NAMES[ai], hand:state.hands[ai+1], melds:state.melds[ai+1],
+    metContract:state.metContract[ai+1], isTurn:state.turn===`ai${ai}`,
+    canLayoff, onLayoff, ownerTurn:`ai${ai}`, buysUsed:state.buysUsed[ai+1], position:pos,
+  });
+
   return(
-    <div style={{minHeight:"100vh",
+    <div style={{
+      minHeight:"100vh",
       background:"radial-gradient(ellipse at 50% 0%,#1b4d30 0%,#0b2b1a 55%,#071c0f 100%)",
       fontFamily:"Georgia,'Times New Roman',serif",color:"#e8dfc8",
-      padding:"8px 10px",boxSizing:"border-box",display:"flex",flexDirection:"column",gap:7}}>
+      padding:"6px 8px",boxSizing:"border-box",
+      display:"flex",flexDirection:"column",gap:5,
+    }}>
 
-      {/* Header */}
-      <div style={{display:"flex",alignItems:"center",gap:10,flexWrap:"wrap"}}>
-        <div style={{flex:1,minWidth:160}}>
-          <div style={{fontSize:8,letterSpacing:3,color:"#6aaa7a",textTransform:"uppercase"}}>Amerikano</div>
-          <div style={{fontSize:15,fontWeight:700,color:"#d4a017",lineHeight:1.2}}>
-            Round {state.roundIndex+1}/7 · {contract.desc}
+      {/* ── Top bar: title + scores + round pills ── */}
+      <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
+        <div style={{flex:1,minWidth:140}}>
+          <div style={{fontSize:7,letterSpacing:3,color:"#6aaa7a",textTransform:"uppercase"}}>Amerikano</div>
+          <div style={{fontSize:13,fontWeight:700,color:"#d4a017",lineHeight:1.2}}>
+            R{state.roundIndex+1}/7 · {contract.desc}
           </div>
         </div>
-        <div style={{display:"flex",gap:8,background:"rgba(0,0,0,0.3)",borderRadius:8,
-          padding:"5px 10px",border:"1px solid rgba(255,255,255,0.07)"}}>
+        <div style={{display:"flex",gap:6,background:"rgba(0,0,0,0.3)",borderRadius:8,
+          padding:"4px 10px",border:"1px solid rgba(255,255,255,0.07)"}}>
           {[["You",0],...AI_NAMES.map((n,i)=>[n,i+1])].map(([name,idx])=>(
-            <div key={idx} style={{textAlign:"center",minWidth:34}}>
-              <div style={{fontSize:8,letterSpacing:0.5,color:"#6aaa7a",textTransform:"uppercase"}}>{name}</div>
-              <div style={{fontSize:15,fontWeight:700,
+            <div key={idx} style={{textAlign:"center",minWidth:30}}>
+              <div style={{fontSize:7,color:"#6aaa7a",textTransform:"uppercase",letterSpacing:0.5}}>{name}</div>
+              <div style={{fontSize:14,fontWeight:700,
                 color:state.turn===(idx===0?"player":`ai${idx-1}`)?"#d4a017":"#e8dfc8"}}>
                 {state.gameScores[idx]}
               </div>
             </div>
           ))}
         </div>
-        <div style={{display:"flex",gap:3}}>
+        <div style={{display:"flex",gap:2}}>
           {CONTRACTS.map((_,i)=>(
-            <div key={i} style={{width:20,height:20,borderRadius:"50%",
-              display:"flex",alignItems:"center",justifyContent:"center",
-              fontSize:9,fontWeight:700,
+            <div key={i} style={{width:18,height:18,borderRadius:"50%",
+              display:"flex",alignItems:"center",justifyContent:"center",fontSize:8,fontWeight:700,
               background:i===state.roundIndex?"rgba(212,160,23,0.25)":"rgba(0,0,0,0.2)",
               border:`1px solid ${i===state.roundIndex?"#d4a017":i<state.roundIndex?"#2a5a3a":"rgba(255,255,255,0.08)"}`,
               color:i===state.roundIndex?"#d4a017":i<state.roundIndex?"#3a7a4a":"#4a6a58",
@@ -743,84 +769,104 @@ export default function ContractRummy(){
         </div>
       </div>
 
-      {/* Opponents */}
-      <div style={{display:"flex",flexDirection:"column",gap:5}}>
-        {AI_NAMES.map((name,ai)=>(
-          <OpponentRow key={ai} name={name} hand={state.hands[ai+1]} melds={state.melds[ai+1]}
-            metContract={state.metContract[ai+1]} isTurn={state.turn===`ai${ai}`}
-            canLayoff={canLayoff} onLayoff={onLayoff} ownerTurn={`ai${ai}`}
-            buysUsed={state.buysUsed[ai+1]}/>
-        ))}
+      {/* ── Sofia — TOP ── */}
+      <OpponentPanel {...sharedPanelProps(0,"top")}/>
+
+      {/* ── Middle row: Marco LEFT · Table CENTER · Leila RIGHT ── */}
+      <div style={{display:"flex",gap:5,alignItems:"stretch",flex:1}}>
+
+        {/* Marco — LEFT */}
+        <OpponentPanel {...sharedPanelProps(1,"left")}/>
+
+        {/* ── Table center ── */}
+        <div style={{flex:1,display:"flex",flexDirection:"column",gap:6,
+          background:"rgba(0,0,0,0.15)",borderRadius:12,padding:"8px 10px",
+          border:"1px solid rgba(255,255,255,0.05)"}}>
+
+          {/* Deck + Discard */}
+          <div style={{display:"flex",justifyContent:"center",alignItems:"flex-end",gap:14}}>
+            <div style={{textAlign:"center"}}>
+              <div onClick={canDraw?()=>dispatch({type:"DRAW_DECK"}):undefined}
+                style={{opacity:canDraw?1:0.35,cursor:canDraw?"pointer":"default",transition:"opacity 0.15s"}}>
+                <Card card={{rank:"",suit:""}} faceDown/>
+              </div>
+              <div style={{fontSize:7,color:"#6aaa7a",marginTop:2,letterSpacing:1}}>DECK·{state.deck.length}</div>
+            </div>
+            <div style={{textAlign:"center"}}>
+              {topDiscard
+                ?<div onClick={canDraw?()=>dispatch({type:"DRAW_DISCARD"}):undefined}
+                   style={{opacity:canDraw?1:0.35,cursor:canDraw?"pointer":"default"}}>
+                   <Card card={topDiscard}/>
+                 </div>
+                :<div style={{width:CW,height:CH,borderRadius:6,
+                   border:"1.5px dashed rgba(255,255,255,0.12)",
+                   display:"flex",alignItems:"center",justifyContent:"center",
+                   color:"rgba(255,255,255,0.15)",fontSize:16}}>∅</div>
+              }
+              <div style={{fontSize:7,color:"#6aaa7a",marginTop:2,letterSpacing:1}}>DISCARD</div>
+            </div>
+          </div>
+
+          {/* Turn indicator + message */}
+          <div style={{textAlign:"center"}}>
+            <div style={{display:"inline-block",padding:"2px 8px",borderRadius:4,marginBottom:3,
+              background:isPlayer?"rgba(212,160,23,0.12)":"rgba(106,170,122,0.08)",
+              border:`1px solid ${isPlayer?"#d4a017":"#6aaa7a"}`,
+              fontSize:8,letterSpacing:1,color:isPlayer?"#d4a017":"#8aca9a",fontWeight:700}}>
+              {isPlayer?"YOUR TURN":`${turnName(state.turn).toUpperCase()}'S TURN`}
+            </div>
+            <div style={{fontSize:10,color:"#b0cabb",fontStyle:"italic",lineHeight:1.4,marginTop:2}}>
+              {state.message}
+            </div>
+          </div>
+
+          {/* All melds on table */}
+          {(state.melds[0].length>0||state.melds[1].length>0||state.melds[2].length>0||state.melds[3].length>0)&&(
+            <div style={{display:"flex",flexDirection:"column",gap:5}}>
+              {[[0,"player","You"],[1,"ai0","Sofia"],[2,"ai1","Marco"],[3,"ai2","Leila"]].map(([pi,ot,lbl])=>(
+                state.melds[pi].length>0&&(
+                  <div key={pi}>
+                    <div style={{fontSize:7,color:pi===0?"#d4a017":"#7ab88a",
+                      letterSpacing:1,marginBottom:3,textTransform:"uppercase"}}>{lbl}</div>
+                    <MeldZone melds={state.melds[pi]} ownerTurn={ot} onLayoff={onLayoff}
+                      canLayoff={canLayoff&&pi!==0?true:canLayoff&&pi===0}/>
+                  </div>
+                )
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Leila — RIGHT */}
+        <OpponentPanel {...sharedPanelProps(2,"right")}/>
       </div>
 
-      {/* Table center */}
-      <div style={{display:"flex",alignItems:"center",gap:10,flexWrap:"wrap"}}>
-        <div style={{textAlign:"center"}}>
-          <div onClick={canDraw?()=>dispatch({type:"DRAW_DECK"}):undefined}
-            style={{opacity:canDraw?1:0.35,cursor:canDraw?"pointer":"default",transition:"opacity 0.15s"}}>
-            <Card card={{rank:"",suit:""}} faceDown/>
-          </div>
-          <div style={{fontSize:8,color:"#6aaa7a",marginTop:2,letterSpacing:1}}>DECK·{state.deck.length}</div>
-        </div>
-        <div style={{textAlign:"center"}}>
-          {topDiscard
-            ?<div onClick={canDraw?()=>dispatch({type:"DRAW_DISCARD"}):undefined}
-               style={{opacity:canDraw?1:0.35,cursor:canDraw?"pointer":"default"}}>
-               <Card card={topDiscard}/>
-             </div>
-            :<div style={{width:CW,height:CH,borderRadius:6,
-               border:"1.5px dashed rgba(255,255,255,0.12)",
-               display:"flex",alignItems:"center",justifyContent:"center",
-               color:"rgba(255,255,255,0.15)",fontSize:16}}>∅</div>
-          }
-          <div style={{fontSize:8,color:"#6aaa7a",marginTop:2,letterSpacing:1}}>DISCARD</div>
-        </div>
-        <div style={{flex:1,minWidth:100}}>
-          <div style={{display:"inline-block",padding:"2px 7px",borderRadius:4,marginBottom:3,
-            background:isPlayer?"rgba(212,160,23,0.12)":"rgba(106,170,122,0.08)",
-            border:`1px solid ${isPlayer?"#d4a017":"#6aaa7a"}`,
-            fontSize:9,letterSpacing:1,color:isPlayer?"#d4a017":"#8aca9a",fontWeight:700}}>
-            {isPlayer?"YOUR TURN":`${turnName(state.turn).toUpperCase()}'S TURN`}
-          </div>
-          <div style={{fontSize:11,color:"#b0cabb",fontStyle:"italic",lineHeight:1.4}}>{state.message}</div>
-        </div>
-        {state.melds[0].length>0&&(
-          <div style={{borderLeft:"1px solid rgba(212,160,23,0.18)",paddingLeft:8}}>
-            <div style={{fontSize:8,color:"#d4a017",letterSpacing:1,marginBottom:3,textTransform:"uppercase"}}>Your Melds</div>
-            <MeldZone melds={state.melds[0]} ownerTurn="player" onLayoff={onLayoff} canLayoff={canLayoff}/>
-          </div>
-        )}
-      </div>
-
-      {/* Player hand area */}
-      <div style={{background:"rgba(0,0,0,0.28)",borderRadius:10,padding:"8px 10px",
+      {/* ── Player hand — BOTTOM ── */}
+      <div style={{
+        background:"rgba(0,0,0,0.28)",borderRadius:10,padding:"7px 10px",
         border:`1.5px solid ${inFirst?"#c0392b":alreadyDown?"rgba(212,160,23,0.6)":state.stagingGroups.length?"#4a90d9":"rgba(212,160,23,0.18)"}`,
-        boxShadow:inFirst?"0 0 12px rgba(192,57,43,0.25)":alreadyDown?"0 0 10px rgba(212,160,23,0.15)":state.stagingGroups.length?"0 0 8px rgba(74,144,217,0.15)":"none"}}>
-
-        {/* Staging area */}
+        boxShadow:inFirst?"0 0 12px rgba(192,57,43,0.25)":alreadyDown?"0 0 10px rgba(212,160,23,0.15)":state.stagingGroups.length?"0 0 8px rgba(74,144,217,0.15)":"none",
+      }}>
+        {/* Staging */}
         {!alreadyDown&&(
-          <StagingArea
-            stagingGroups={state.stagingGroups}
-            hand={state.hands[0]}
-            contract={contract}
-            onDisband={(gi)=>dispatch({type:"DISBAND_GROUP",groupIdx:gi})}
-            canDisband={canMeld}
-          />
+          <StagingArea stagingGroups={state.stagingGroups} hand={state.hands[0]}
+            contract={contract} onDisband={(gi)=>dispatch({type:"DISBAND_GROUP",groupIdx:gi})}
+            canDisband={canMeld}/>
         )}
 
-        {/* Header + buttons */}
+        {/* Hand header + buttons */}
         <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",
-          marginBottom:7,flexWrap:"wrap",gap:6}}>
-          <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
+          marginBottom:6,flexWrap:"wrap",gap:5}}>
+          <div style={{display:"flex",alignItems:"center",gap:7,flexWrap:"wrap"}}>
             <span style={{fontSize:10,letterSpacing:1.5,color:"#d4a017",textTransform:"uppercase",fontWeight:700}}>
               Your Hand ({state.hands[0].length})
             </span>
-            {inFirst&&<span style={{fontSize:10,color:"#e74c3c",fontWeight:700}}>SELECT 1 TO DISCARD FIRST</span>}
-            {alreadyDown&&<span style={{fontSize:10,color:"#d4a017"}}>✓ DOWN</span>}
-            <span style={{fontSize:9,color:"#4a7060"}}>Buys: {state.buysUsed[0]}/3</span>
+            {inFirst&&<span style={{fontSize:9,color:"#e74c3c",fontWeight:700}}>SELECT 1 TO DISCARD FIRST</span>}
+            {alreadyDown&&<span style={{fontSize:9,color:"#d4a017"}}>✓ DOWN</span>}
+            <span style={{fontSize:8,color:"#4a7060"}}>Buys:{state.buysUsed[0]}/3</span>
             {!alreadyDown&&state.stagingGroups.length>0&&(
-              <span style={{fontSize:10,color:"#4a90d9"}}>
-                {state.stagingGroups.length}/{contract.sets+contract.runs} groups staged
+              <span style={{fontSize:9,color:"#4a90d9"}}>
+                {state.stagingGroups.length}/{contract.sets+contract.runs} staged
               </span>
             )}
           </div>
@@ -831,14 +877,10 @@ export default function ContractRummy(){
                   onClick={()=>dispatch({type:"FIRST_DISCARD"})}/>
               :<>
                 {!alreadyDown&&<>
-                  <Btn label="Stage Group" color="#4a90d9"
-                    disabled={!canStage}
-                    onClick={()=>dispatch({type:"STAGE_GROUP"})}
-                    title="Select cards for one meld, then stage"/>
-                  <Btn label="Go Down ↓" color="#d4a017"
-                    disabled={!canGoDown}
-                    onClick={()=>dispatch({type:"GO_DOWN"})}
-                    title="Commit all staged groups to the table"/>
+                  <Btn label="Stage" color="#4a90d9" disabled={!canStage}
+                    onClick={()=>dispatch({type:"STAGE_GROUP"})}/>
+                  <Btn label="Go Down ↓" color="#d4a017" disabled={!canGoDown}
+                    onClick={()=>dispatch({type:"GO_DOWN"})}/>
                 </>}
                 <Btn label="Discard" color="#b05020"
                   disabled={!canMeld||state.selectedCards.length!==1||stagedIds.has(state.selectedCards[0])}
@@ -849,7 +891,7 @@ export default function ContractRummy(){
         </div>
 
         {/* Card row */}
-        <div style={{overflowX:"auto",WebkitOverflowScrolling:"touch",paddingBottom:10}}>
+        <div style={{overflowX:"auto",WebkitOverflowScrolling:"touch",paddingBottom:8}}>
           <div style={{display:"flex",gap:5,width:"max-content"}}>
             {state.hands[0].map((card,i)=>{
               const isStaged=stagedIds.has(card.id);
@@ -870,10 +912,10 @@ export default function ContractRummy(){
             })}
           </div>
         </div>
-        <div style={{fontSize:9,color:"#3a6a4a",fontStyle:"italic",marginTop:2}}>
+        <div style={{fontSize:8,color:"#3a6a4a",fontStyle:"italic",marginTop:2}}>
           {alreadyDown
-            ?"Tap 1 card to select it → then tap a meld on the table to lay it off. Or tap 1 card → Discard to end turn."
-            :"Select cards for a meld → Stage Group · Stage all groups → Go Down ↓ · Click staged group to disband"}
+            ?"Tap 1 card → tap a meld above to lay off · Or tap 1 card → Discard"
+            :"Select cards → Stage · Stage all groups → Go Down ↓ · Tap a staged group to disband"}
         </div>
       </div>
 
