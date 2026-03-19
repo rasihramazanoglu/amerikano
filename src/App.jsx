@@ -511,16 +511,19 @@ function reducer(state,action){
 // ── Drag reorder ──────────────────────────────────────────────────────────────
 function useDragReorder(dispatch){
   const dragFrom=useRef(null);
+  const isDiscarding=useRef(false);
   return{
-    onDragStart:(i)=>{dragFrom.current=i;},
+    onDragStart:(i)=>{dragFrom.current=i; isDiscarding.current=false;},
     onDragOver:(e,i)=>{
       e.preventDefault();
+      if(isDiscarding.current) return; // don't reorder if heading to discard
       if(dragFrom.current!==null&&dragFrom.current!==i){
         dispatch({type:"REORDER_HAND",from:dragFrom.current,to:i});
         dragFrom.current=i;
       }
     },
-    onDragEnd:()=>{dragFrom.current=null;},
+    onDragEnd:()=>{dragFrom.current=null; isDiscarding.current=false;},
+    setDiscarding:(v)=>{isDiscarding.current=v;},
   };
 }
 
@@ -613,29 +616,39 @@ function StagingArea({stagingGroups,hand,contract,onDisband,canDisband}){
 }
 
 // ── Meld zone (committed table melds) ─────────────────────────────────────────
-function MeldZone({melds,ownerTurn,onLayoff,canLayoff}){
+function meldFits(meld, card){
+  // Check if card can extend this meld at either end (runs) or add to set
+  const ext=[...meld,card];
+  return isSet(ext)||isRun(ext);
+}
+
+function MeldZone({melds,ownerTurn,onLayoff,canLayoff,layoffCard}){
   if(!melds.length) return null;
   return(
     <div style={{display:"flex",flexWrap:"wrap",gap:4}}>
-      {melds.map((meld,i)=>(
-        <div key={i} onClick={canLayoff?()=>onLayoff(ownerTurn,i):undefined}
-          title={canLayoff?"Tap to lay off your selected card here":""}
-          style={{display:"flex",gap:1,padding:"4px 6px",borderRadius:6,
-            background:canLayoff?"rgba(212,160,23,0.1)":"rgba(255,255,255,0.05)",
-            border:canLayoff?"2px dashed #d4a017":"1px solid rgba(255,255,255,0.1)",
-            boxShadow:canLayoff?"0 0 8px rgba(212,160,23,0.3)":"none",
-            cursor:canLayoff?"pointer":"default",
-            transition:"all 0.15s",
-            position:"relative"}}>
-          {canLayoff&&<div style={{
-            position:"absolute",top:-10,left:"50%",transform:"translateX(-50%)",
-            background:"#d4a017",color:"#1a1a0a",fontSize:8,fontWeight:700,
-            padding:"1px 5px",borderRadius:3,letterSpacing:0.5,whiteSpace:"nowrap",
-            pointerEvents:"none",
-          }}>TAP TO LAY OFF</div>}
-          {meld.map(c=><Card key={c.id} card={c}/>)}
-        </div>
-      ))}
+      {melds.map((meld,i)=>{
+        const fits = canLayoff && layoffCard && meldFits(meld, layoffCard);
+        return(
+          <div key={i} onClick={fits?()=>onLayoff(ownerTurn,i):undefined}
+            title={fits?"Tap to lay off here":canLayoff?"Card doesn't fit this meld":""}
+            style={{display:"flex",gap:1,padding:"4px 6px",borderRadius:6,
+              background:fits?"rgba(212,160,23,0.1)":"rgba(255,255,255,0.05)",
+              border:fits?"2px dashed #d4a017":canLayoff?"1px solid rgba(255,255,255,0.2)":"1px solid rgba(255,255,255,0.1)",
+              boxShadow:fits?"0 0 8px rgba(212,160,23,0.3)":"none",
+              cursor:fits?"pointer":"default",
+              opacity:canLayoff&&!fits?0.5:1,
+              transition:"all 0.15s",
+              position:"relative"}}>
+            {fits&&<div style={{
+              position:"absolute",top:-10,left:"50%",transform:"translateX(-50%)",
+              background:"#d4a017",color:"#1a1a0a",fontSize:8,fontWeight:700,
+              padding:"1px 5px",borderRadius:3,letterSpacing:0.5,whiteSpace:"nowrap",
+              pointerEvents:"none",
+            }}>TAP TO LAY OFF</div>}
+            {meld.map(c=><Card key={c.id} card={c}/>)}
+          </div>
+        );
+      })}
     </div>
   );
 }
@@ -826,16 +839,18 @@ export default function ContractRummy(){
 
         {/* ── Table center — also a discard drop zone ── */}
         <div
+          onDragEnter={(e)=>{ e.preventDefault(); if(draggingCardId.current&&canMeld){ setDiscardHover(true); drag.setDiscarding(true); }}}
           onDragOver={(e)=>{ e.preventDefault(); if(draggingCardId.current&&canMeld) setDiscardHover(true); }}
-          onDragLeave={(e)=>{ if(!e.currentTarget.contains(e.relatedTarget)) setDiscardHover(false); }}
+          onDragLeave={(e)=>{ if(!e.currentTarget.contains(e.relatedTarget)){ setDiscardHover(false); drag.setDiscarding(false); }}}
           onDrop={(e)=>{
             e.preventDefault();
-            const cid = draggingCardId.current || e.dataTransfer.getData('cardId');
+            const cid = draggingCardId.current;
             if(cid&&canMeld&&!state.stagingGroups.flat().includes(cid)){
               dispatch({type:"DISCARD_BY_ID",id:cid});
             }
             setDiscardHover(false);
             draggingCardId.current=null;
+            drag.setDiscarding(false);
           }}
           style={{flex:1,display:"flex",flexDirection:"column",gap:6,
             background:discardHover?"rgba(176,80,32,0.12)":"rgba(0,0,0,0.15)",
@@ -898,7 +913,7 @@ export default function ContractRummy(){
                     <div style={{fontSize:7,color:pi===0?"#d4a017":"#7ab88a",
                       letterSpacing:1,marginBottom:3,textTransform:"uppercase"}}>{lbl}</div>
                     <MeldZone melds={state.melds[pi]} ownerTurn={ot} onLayoff={onLayoff}
-                      canLayoff={canLayoff&&pi!==0?true:canLayoff&&pi===0}/>
+                      canLayoff={canLayoff} layoffCard={canLayoff?state.hands[0].find(c=>c.id===state.selectedCards[0]):null}/>
                   </div>
                 )
               ))}
