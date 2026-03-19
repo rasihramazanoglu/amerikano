@@ -534,21 +534,17 @@ function Card({card,selected,staged,onClick,faceDown,small,draggable,onDragStart
         transform:`translateY(${ty}px)`,transition:"transform 0.12s,box-shadow 0.12s",
         cursor:onClick?"pointer":"default",userSelect:"none",overflow:"hidden"}}>
       {/* Top-left: rank only */}
-      <div style={{position:"absolute",top:3,left:4,fontSize:12,fontWeight:800,
+      <div style={{position:"absolute",top:3,left:4,fontSize:15,fontWeight:800,
         color,fontFamily:"Georgia,serif",lineHeight:1}}>
         {isJoker?"JK":card.rank}
       </div>
       {/* Center: large suit */}
       <div style={{position:"absolute",top:"50%",left:"50%",
         transform:"translate(-50%,-50%)",
-        fontSize:isJoker?22:32,color,lineHeight:1}}>
+        fontSize:isJoker?30:46,color,lineHeight:1}}>
         {isJoker?"★":card.suit}
       </div>
-      {/* Bottom-right: rank only, rotated 180° */}
-      <div style={{position:"absolute",bottom:3,right:4,fontSize:12,fontWeight:800,
-        color,fontFamily:"Georgia,serif",lineHeight:1,transform:"rotate(180deg)"}}>
-        {isJoker?"JK":card.rank}
-      </div>
+
     </div>
   );
 }
