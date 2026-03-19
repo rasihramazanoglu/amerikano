@@ -530,18 +530,23 @@ function Card({card,selected,staged,onClick,faceDown,small,draggable,onDragStart
   return(
     <div draggable={draggable} onDragStart={onDragStart} onDragOver={onDragOver} onDragEnd={onDragEnd}
       onClick={onClick} style={{width:CW,height:CH,borderRadius:6,flexShrink:0,
-        background:bg,border,boxShadow:shadow,
+        background:bg,border,boxShadow:shadow,position:"relative",
         transform:`translateY(${ty}px)`,transition:"transform 0.12s,box-shadow 0.12s",
-        cursor:onClick?"pointer":"default",display:"flex",flexDirection:"column",
-        alignItems:"flex-start",justifyContent:"space-between",
-        padding:"3px 4px",userSelect:"none"}}>
-      <div style={{fontSize:11,fontWeight:800,color,lineHeight:1,fontFamily:"Georgia,serif"}}>
+        cursor:onClick?"pointer":"default",userSelect:"none",overflow:"hidden"}}>
+      {/* Top-left: rank only */}
+      <div style={{position:"absolute",top:3,left:4,fontSize:12,fontWeight:800,
+        color,fontFamily:"Georgia,serif",lineHeight:1}}>
         {isJoker?"JK":card.rank}
       </div>
-      <div style={{fontSize:isJoker?10:16,color,lineHeight:1,alignSelf:"center",fontWeight:isJoker?700:400}}>
+      {/* Center: large suit */}
+      <div style={{position:"absolute",top:"50%",left:"50%",
+        transform:"translate(-50%,-50%)",
+        fontSize:isJoker?22:32,color,lineHeight:1}}>
         {isJoker?"★":card.suit}
       </div>
-      <div style={{fontSize:11,fontWeight:800,color,lineHeight:1,transform:"rotate(180deg)",fontFamily:"Georgia,serif"}}>
+      {/* Bottom-right: rank only, rotated 180° */}
+      <div style={{position:"absolute",bottom:3,right:4,fontSize:12,fontWeight:800,
+        color,fontFamily:"Georgia,serif",lineHeight:1,transform:"rotate(180deg)"}}>
         {isJoker?"JK":card.rank}
       </div>
     </div>
