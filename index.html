@@ -8,32 +8,65 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="Amerikano" />
     <link rel="manifest" href="/manifest.json" />
-    <link rel="apple-touch-icon" href="/icon.svg" />
-    <title>Amerikano — Contract Rummy</title>
+    <link rel="icon" href="/icon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.svg" />
+    <title>Amerikano</title>
     <style>
-      *, *::before, *::after { -webkit-tap-highlight-color: transparent; box-sizing: border-box; margin: 0; padding: 0; }
-      html {
-        height: 100%;
-        background: #071c0f;
+      *, *::before, *::after {
+        -webkit-tap-highlight-color: transparent;
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
       }
-      body {
-        height: 100%;
+      html, body {
         width: 100%;
+        height: 100%;
         background: #071c0f;
-        overscroll-behavior: none;
         overflow: hidden;
+        overscroll-behavior: none;
       }
       #root {
-        height: 100%;
         width: 100%;
+        height: 100%;
+      }
+      /* Force landscape — show rotate prompt in portrait */
+      @media screen and (orientation: portrait) {
+        #root { display: none; }
+        #rotate-msg {
+          display: flex !important;
+        }
+      }
+      #rotate-msg {
+        display: none;
+        position: fixed;
+        inset: 0;
+        background: #071c0f;
+        color: #d4a017;
+        font-family: Georgia, serif;
+        font-size: 20px;
+        align-items: center;
+        justify-content: center;
+        flex-direction: column;
+        gap: 16px;
+        text-align: center;
+        padding: 32px;
+        z-index: 9999;
       }
     </style>
   </head>
   <body>
+    <div id="rotate-msg">
+      <div style="font-size:48px">↺</div>
+      <div>Rotate to landscape<br/>to play Amerikano</div>
+    </div>
     <div id="root"></div>
     <script>
-      if('serviceWorker' in navigator) {
+      if ('serviceWorker' in navigator) {
         navigator.serviceWorker.register('/sw.js');
+      }
+      // Attempt to lock orientation on supported browsers
+      if (screen.orientation && screen.orientation.lock) {
+        screen.orientation.lock('landscape').catch(() => {});
       }
     </script>
     <script type="module" src="/src/main.jsx"></script>
