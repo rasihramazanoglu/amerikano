@@ -848,11 +848,13 @@ export default function ContractRummy(){
 
   return(
     <div style={{
-      minHeight:"100vh",
+      height:"100dvh",
       background:"radial-gradient(ellipse at 50% 0%,#1b4d30 0%,#0b2b1a 55%,#071c0f 100%)",
       fontFamily:"Georgia,'Times New Roman',serif",color:"#e8dfc8",
-      padding:"6px 8px",boxSizing:"border-box",
+      padding:"env(safe-area-inset-top, 6px) env(safe-area-inset-right, 8px) env(safe-area-inset-bottom, 6px) env(safe-area-inset-left, 8px)",
+      boxSizing:"border-box",
       display:"flex",flexDirection:"column",gap:5,
+      overflow:"hidden",
     }}>
 
       {/* ── Top bar: title + scores + round pills ── */}
