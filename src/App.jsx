@@ -875,6 +875,43 @@ export default function ContractRummy(){
     }
   },[state.buyWindow]);
 
+  const topDiscard=state.discardPile[state.discardPile.length-1];
+  const isPlayer=state.turn==="player";
+  const canDraw=isPlayer&&state.phase==="draw";
+  const canMeld=isPlayer&&state.phase==="meld";
+  const inFirst=isPlayer&&state.phase==="discard_first";
+  const alreadyDown=state.metContract[0];
+  const stagedIds=new Set(state.stagingGroups.flat());
+
+  const canLayoff=canMeld&&alreadyDown&&
+    state.selectedCards.length===1&&
+    !stagedIds.has(state.selectedCards[0]);
+
+  const onLayoff=(ownerTurn,meldIdx)=>{
+    if(canLayoff) dispatch({type:"LAYOFF",ownerTurn,meldIdx});
+  };
+
+  const stagingCards=state.stagingGroups.map(g=>state.hands[0].filter(c=>g.includes(c.id)));
+  const canGoDown=canMeld&&!alreadyDown&&
+    state.stagingGroups.length>0&&
+    contractMet(stagingCards,contract)&&
+    stagingCards.every(g=>isSet(g)||isRun(g));
+
+  const selectedCards=state.hands[0].filter(c=>state.selectedCards.includes(c.id));
+  const selIsValidMeld=selectedCards.length>=3&&isValidMeld(selectedCards);
+  const currentSets=stagingCards.filter(g=>isSet(g)).length;
+  const currentRuns=stagingCards.filter(g=>isRun(g)).length;
+  const wouldBeSet=selIsValidMeld&&isSet(selectedCards);
+  const wouldBeRun=selIsValidMeld&&isRun(selectedCards);
+  const canStage=canMeld&&!alreadyDown&&selIsValidMeld&&
+    (wouldBeSet?currentSets<contract.sets:currentRuns<contract.runs);
+
+  const sharedPanelProps=(ai,pos)=>({
+    key:ai, name:AI_NAMES[ai], hand:state.hands[ai+1],
+    metContract:state.metContract[ai+1], isTurn:state.turn===`ai${ai}`,
+    buysUsed:state.buysUsed[ai+1], position:pos,
+  });
+
   const layoffCard = canLayoff ? state.hands[0].find(c=>c.id===state.selectedCards[0]) : null;
 
   return(
