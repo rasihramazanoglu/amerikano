@@ -116,11 +116,12 @@ function aiBuildMelds(hand,contract){
 // ── Buy eligibility ──────────────────────────────────────────────────────────
 // Returns ordered list of player turns that are eligible to buy (clockwise, skip active)
 function buyEligible(activeTurn, metContract, buysUsed){
-  const order=TURN_ORDER; // same clockwise order as play
+  const order=TURN_ORDER;
   const activeIdx=order.indexOf(activeTurn);
-  // clockwise starting after active player
+  // i=1 is the NEXT player — they get the discard for free, not eligible to buy
+  // Only i=2 and i=3 (the other two players) can buy at a penalty
   const eligible=[];
-  for(let i=1;i<=3;i++){
+  for(let i=2;i<=3;i++){
     const t=order[(activeIdx+i)%4];
     const pi=pIdx(t);
     if(!metContract[pi]&&buysUsed[pi]<3) eligible.push(t);
@@ -189,12 +190,12 @@ function endRound(state,winnerTurn,hands,lastDiscard){
 }
 
 // ── Post-discard buy resolution ──────────────────────────────────────────────
-// Clockwise order is respected strictly:
-// - AIs before the player in clockwise order auto-decide first
-// - If none of them buy, the player gets the buy window
-// - If the player passes (PASS_BUY), remaining AIs after the player then auto-decide
-//   via a RESOLVE_BUY_TAIL action
-// - If player discarded, they are excluded entirely (can't buy own discard)
+// Correct Amerikano buy rule:
+// - The NEXT player in turn order gets first right to the discard — free, no penalty
+// - Only the OTHER two players (i=2,3 clockwise) can "buy" — they pay a penalty card
+// - Buying window only opens BEFORE the next player draws
+// - If player is next (i=1), no popup — they just draw normally from deck or discard
+// - If player is NOT next (i=2 or 3), show buy window before next player acts
 function resolveAfterDiscard(state, activeTurn, discardedCard){
   const nt = nextTurn(activeTurn);
   const eligible = buyEligible(activeTurn, state.metContract, state.buysUsed);
@@ -236,7 +237,7 @@ function resolveAfterDiscard(state, activeTurn, discardedCard){
       buyWindowNext:nt,
       buyWindowTail:afterPlayer, // AIs still to decide after player passes
       aiTurnPending:false,
-      message:`${turnName(activeTurn)} discarded ${discardLabel}. Buy it? (+1 penalty card)`};
+      message:`${turnName(activeTurn)} discarded ${discardLabel}. Buy it before ${turnName(nt)} draws? (+1 penalty card)`};
   }
 
   // No player in eligible — let remaining AIs (afterPlayer = all eligible) decide
@@ -875,12 +876,15 @@ export default function ContractRummy(){
 
   return(
     <div style={{
+      width:"100vw",
       height:"100dvh",
+      maxWidth:"100vw",
+      maxHeight:"100dvh",
       background:"radial-gradient(ellipse at 50% 0%,#1b4d30 0%,#0b2b1a 55%,#071c0f 100%)",
       fontFamily:"Georgia,'Times New Roman',serif",color:"#e8dfc8",
-      padding:"env(safe-area-inset-top, 6px) env(safe-area-inset-right, 8px) env(safe-area-inset-bottom, 6px) env(safe-area-inset-left, 8px)",
+      padding:"max(env(safe-area-inset-top),4px) max(env(safe-area-inset-right),6px) max(env(safe-area-inset-bottom),4px) max(env(safe-area-inset-left),6px)",
       boxSizing:"border-box",
-      display:"flex",flexDirection:"column",gap:4,
+      display:"flex",flexDirection:"column",gap:"1vh",
       overflow:"hidden",
     }}>
 
