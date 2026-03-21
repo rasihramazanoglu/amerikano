@@ -564,7 +564,7 @@ function useDragReorder(dispatch){
     onDragStart:(i)=>{dragFrom.current=i; isDiscarding.current=false;},
     onDragOver:(e,i)=>{
       e.preventDefault();
-      if(isDiscarding.current) return; // don't reorder if heading to discard
+      if(isDiscarding.current) return;
       if(dragFrom.current!==null&&dragFrom.current!==i){
         dispatch({type:"REORDER_HAND",from:dragFrom.current,to:i});
         dragFrom.current=i;
@@ -575,8 +575,60 @@ function useDragReorder(dispatch){
   };
 }
 
+// Touch-based drag reorder for mobile
+function useTouchReorder(dispatch, draggingCardId, setDiscardHover) {
+  const touchFrom = useRef(null);
+  const touchCardIds = useRef([]);
+
+  const onTouchStart = (i, cardId, allCardIds) => (e) => {
+    touchFrom.current = i;
+    touchCardIds.current = allCardIds;
+    draggingCardId.current = cardId;
+  };
+
+  const onTouchMove = (e) => {
+    e.preventDefault();
+    const touch = e.touches[0];
+    // Find which card we're over using elementFromPoint
+    const el = document.elementFromPoint(touch.clientX, touch.clientY);
+    // Check if over center table (discard zone)
+    const centerZone = document.getElementById('center-table');
+    if(centerZone && centerZone.contains(el)) {
+      setDiscardHover(true);
+      return;
+    }
+    setDiscardHover(false);
+    // Find card index from data attribute
+    const cardEl = el?.closest('[data-cardidx]');
+    if(cardEl) {
+      const toIdx = parseInt(cardEl.dataset.cardidx);
+      if(touchFrom.current !== null && touchFrom.current !== toIdx) {
+        dispatch({type:"REORDER_HAND", from:touchFrom.current, to:toIdx});
+        touchFrom.current = toIdx;
+      }
+    }
+  };
+
+  const onTouchEnd = (e, canMeld, stagingGroups, dispatchFn) => {
+    const touch = e.changedTouches[0];
+    const el = document.elementFromPoint(touch.clientX, touch.clientY);
+    const centerZone = document.getElementById('center-table');
+    if(centerZone && centerZone.contains(el) && draggingCardId.current && canMeld) {
+      const cid = draggingCardId.current;
+      if(!stagingGroups.flat().includes(cid)) {
+        dispatchFn({type:"DISCARD_BY_ID", id:cid});
+      }
+    }
+    draggingCardId.current = null;
+    touchFrom.current = null;
+    setDiscardHover(false);
+  };
+
+  return { onTouchStart, onTouchMove, onTouchEnd };
+}
+
 // ── Card ──────────────────────────────────────────────────────────────────────
-const CW=46,CH=68;
+const CW=54,CH=80; // slightly larger for easier touch
 function Card({card,selected,staged,onClick,faceDown,small,draggable,onDragStart,onDragOver,onDragEnd}){
   const w = small ? 20 : CW;
   const h = small ? 30 : CH;
@@ -770,7 +822,7 @@ function Btn({label,color,disabled,onClick,title}){
       background:disabled?"rgba(255,255,255,0.03)":`${color}18`,
       border:`1px solid ${disabled?"rgba(255,255,255,0.08)":color}`,
       borderRadius:6,color:disabled?"#385248":color,
-      fontSize:11,fontWeight:700,padding:"6px 12px",flexShrink:0,
+      fontSize:12,fontWeight:700,padding:"9px 16px",flexShrink:0,
       cursor:disabled?"not-allowed":"pointer",letterSpacing:0.5,
       fontFamily:"Georgia,serif",transition:"all 0.1s",
     }}>{label}</button>
@@ -781,9 +833,10 @@ function Btn({label,color,disabled,onClick,title}){
 export default function ContractRummy(){
   const[state,dispatch]=useReducer(reducer,undefined,initialState);
   const drag=useDragReorder(dispatch);
-  const contract=CONTRACTS[state.roundIndex];
   const draggingCardId = useRef(null);
   const [discardHover, setDiscardHover] = useState(false);
+  const touch=useTouchReorder(dispatch, draggingCardId, setDiscardHover);
+  const contract=CONTRACTS[state.roundIndex];
 
   useEffect(()=>{
     if(state.aiTurnPending&&!state.roundOver){
@@ -895,6 +948,7 @@ export default function ContractRummy(){
 
         {/* ── Table center — also a discard drop zone ── */}
         <div
+          id="center-table"
           onDragEnter={(e)=>{ e.preventDefault(); if(draggingCardId.current&&canMeld){ setDiscardHover(true); drag.setDiscarding(true); }}}
           onDragOver={(e)=>{ e.preventDefault(); if(draggingCardId.current&&canMeld) setDiscardHover(true); }}
           onDragLeave={(e)=>{ if(!e.currentTarget.contains(e.relatedTarget)){ setDiscardHover(false); drag.setDiscarding(false); }}}
@@ -1047,7 +1101,7 @@ export default function ContractRummy(){
 
         {/* Card row — clips top of rising selected cards */}
         <div style={{overflow:"hidden",borderRadius:"8px 8px 0 0",marginTop:4}}>  
-        <div style={{overflowX:"auto",WebkitOverflowScrolling:"touch",paddingBottom:8,paddingTop:20}}>
+        <div style={{overflowX:"auto",WebkitOverflowScrolling:"touch",paddingBottom:8,paddingTop:20,touchAction:"pan-x"}}>
           <div style={{display:"flex",gap:5,width:"max-content",margin:"0 auto"}}>
             {state.hands[0].map((card,i)=>{
               const isStaged=stagedIds.has(card.id);
@@ -1059,10 +1113,14 @@ export default function ContractRummy(){
                     if(inFirst) dispatch({type:"TOGGLE_CARD_FIRST",id:card.id});
                     else if(canMeld&&!isStaged) dispatch({type:"TOGGLE_CARD",id:card.id});
                   }}
+                  data-cardidx={i}
                   draggable={!isStaged}
                   onDragStart={!isStaged?(e)=>{ drag.onDragStart(i); draggingCardId.current=card.id; e.dataTransfer.setData('cardId',card.id); }:undefined}
                   onDragOver={!isStaged?(e)=>drag.onDragOver(e,i):undefined}
                   onDragEnd={!isStaged?()=>{ drag.onDragEnd(); draggingCardId.current=null; setDiscardHover(false); }:undefined}
+                  onTouchStart={!isStaged?touch.onTouchStart(i,card.id,state.hands[0].map(c=>c.id)):undefined}
+                  onTouchMove={!isStaged?touch.onTouchMove:undefined}
+                  onTouchEnd={!isStaged?(e)=>touch.onTouchEnd(e,canMeld,state.stagingGroups,dispatch):undefined}
                 />
               );
             })}
