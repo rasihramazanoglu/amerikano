@@ -576,7 +576,7 @@ function useDragReorder(dispatch){
 }
 
 // ── Card ──────────────────────────────────────────────────────────────────────
-const CW=54,CH=80; // slightly larger for easier touch
+const CW=48,CH=70;
 function Card({card,selected,staged,onClick,faceDown,small,draggable,onDragStart,onDragOver,onDragEnd}){
   const w = small ? 20 : CW;
   const h = small ? 30 : CH;
@@ -706,58 +706,85 @@ function OpponentPanel({name,hand,metContract,isTurn,buysUsed,position}){
   const isVertical = position==="left"||position==="right";
   const accent = isTurn?"#d4a017":"#7ab88a";
   const buysLeft = 3-buysUsed;
+  const CWs=42, CHs=58; // smaller card for opponent panels
+
+  if(isVertical){
+    // Left/right: ultra-compact vertical strip
+    return(
+      <div style={{
+        display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",
+        gap:5,
+        background:isTurn?"rgba(212,160,23,0.07)":"rgba(0,0,0,0.22)",
+        border:`1px solid ${isTurn?"rgba(212,160,23,0.45)":"rgba(255,255,255,0.07)"}`,
+        borderRadius:10,padding:"6px 5px",width:72,
+      }}>
+        <div style={{fontSize:9,fontWeight:700,color:accent,letterSpacing:0.5,
+          textTransform:"uppercase",textAlign:"center",lineHeight:1.2}}>
+          {name.replace("Player ","")}
+          <div style={{fontSize:7,opacity:0.7}}>P{name.slice(-1)}</div>
+        </div>
+        {/* Mini stack card */}
+        <div style={{position:"relative",width:CWs+6,height:CHs+6,flexShrink:0}}>
+          <div style={{position:"absolute",top:4,left:4,width:CWs,height:CHs,borderRadius:5,
+            background:"linear-gradient(135deg,#0a1e12,#050f08)",border:"1px solid #152d1e"}}/>
+          <div style={{position:"absolute",top:2,left:2,width:CWs,height:CHs,borderRadius:5,
+            background:"linear-gradient(135deg,#0d2318,#071a0f)",border:"1px solid #1a4028"}}/>
+          <div style={{position:"absolute",top:0,left:0,width:CWs,height:CHs,borderRadius:5,
+            background:"linear-gradient(135deg,#1a4a2e,#0d2e1a)",
+            border:`2px solid ${isTurn?"#d4a017":"#2a6042"}`,
+            display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",
+            boxShadow:isTurn?"0 0 8px rgba(212,160,23,0.35)":"none",
+          }}>
+            <div style={{fontSize:22,fontWeight:800,color:isTurn?"#d4a017":"#4a9060",
+              fontFamily:"Georgia,serif",lineHeight:1}}>{hand.length}</div>
+            <div style={{fontSize:7,color:"#3a7050",letterSpacing:0.5,marginTop:1}}>cards</div>
+          </div>
+        </div>
+        <div style={{textAlign:"center"}}>
+          <div style={{fontSize:16,fontWeight:800,lineHeight:1,fontFamily:"Georgia,serif",
+            color:buysLeft===0?"#5a3a3a":buysLeft===1?"#c06030":"#4a9060"}}>{buysLeft}</div>
+          <div style={{fontSize:6,color:"#3a6050",letterSpacing:0.5,textTransform:"uppercase"}}>buys</div>
+        </div>
+        {metContract&&<div style={{fontSize:7,color:"#d4a017",letterSpacing:0.5}}>✓ DOWN</div>}
+        {isTurn&&<div style={{fontSize:7,color:"#d4a017",letterSpacing:0.5,fontWeight:700}}>TURN</div>}
+      </div>
+    );
+  }
+
+  // Top: horizontal compact strip
   return(
     <div style={{
-      display:"flex",flexDirection:"column",
-      alignItems:"center",justifyContent:"center",
-      gap:8,
+      display:"flex",alignItems:"center",justifyContent:"center",gap:12,
       background:isTurn?"rgba(212,160,23,0.07)":"rgba(0,0,0,0.22)",
       border:`1px solid ${isTurn?"rgba(212,160,23,0.45)":"rgba(255,255,255,0.07)"}`,
-      borderRadius:10,padding:"10px 8px",
-      width: isVertical ? 96 : "100%",
-      minHeight: isVertical ? 200 : undefined,
+      borderRadius:10,padding:"5px 14px",
     }}>
-      {/* Name */}
-      <div style={{textAlign:"center"}}>
-        <div style={{fontSize:11,fontWeight:700,color:accent,
-          letterSpacing:1,textTransform:"uppercase"}}>
-          {name}
-        </div>
-        {metContract&&<div style={{fontSize:8,color:"#d4a017",marginTop:1,letterSpacing:1}}>✓ DOWN</div>}
-        {isTurn&&!metContract&&<div style={{fontSize:8,color:"#d4a017",marginTop:1,letterSpacing:1}}>TURN</div>}
+      <div style={{textAlign:"center",minWidth:60}}>
+        <div style={{fontSize:10,fontWeight:700,color:accent,letterSpacing:1,textTransform:"uppercase"}}>{name}</div>
+        {metContract&&<div style={{fontSize:8,color:"#d4a017",letterSpacing:1}}>✓ DOWN</div>}
+        {isTurn&&!metContract&&<div style={{fontSize:8,color:"#d4a017",fontWeight:700}}>TURN</div>}
       </div>
-
-      {/* Stack card showing card count */}
-      <div style={{position:"relative",width:CW+8,height:CH+8,flexShrink:0}}>
-        <div style={{position:"absolute",top:6,left:6,width:CW,height:CH,borderRadius:6,
+      {/* Stack card */}
+      <div style={{position:"relative",width:CWs+6,height:CHs+6,flexShrink:0}}>
+        <div style={{position:"absolute",top:4,left:4,width:CWs,height:CHs,borderRadius:5,
           background:"linear-gradient(135deg,#0a1e12,#050f08)",border:"1px solid #152d1e"}}/>
-        <div style={{position:"absolute",top:3,left:3,width:CW,height:CH,borderRadius:6,
+        <div style={{position:"absolute",top:2,left:2,width:CWs,height:CHs,borderRadius:5,
           background:"linear-gradient(135deg,#0d2318,#071a0f)",border:"1px solid #1a4028"}}/>
-        <div style={{position:"absolute",top:0,left:0,width:CW,height:CH,borderRadius:6,
+        <div style={{position:"absolute",top:0,left:0,width:CWs,height:CHs,borderRadius:5,
           background:"linear-gradient(135deg,#1a4a2e,#0d2e1a)",
           border:`2px solid ${isTurn?"#d4a017":"#2a6042"}`,
           display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",
-          boxShadow:isTurn?"0 0 10px rgba(212,160,23,0.35)":"0 3px 10px rgba(0,0,0,0.5)",
+          boxShadow:isTurn?"0 0 8px rgba(212,160,23,0.35)":"none",
         }}>
-          <div style={{fontSize:28,fontWeight:800,color:isTurn?"#d4a017":"#4a9060",
-            fontFamily:"Georgia,serif",lineHeight:1}}>
-            {hand.length}
-          </div>
-          <div style={{fontSize:8,color:"#3a7050",letterSpacing:1,textTransform:"uppercase",marginTop:3}}>
-            cards
-          </div>
+          <div style={{fontSize:22,fontWeight:800,color:isTurn?"#d4a017":"#4a9060",
+            fontFamily:"Georgia,serif",lineHeight:1}}>{hand.length}</div>
+          <div style={{fontSize:7,color:"#3a7050",letterSpacing:0.5,marginTop:1}}>cards</div>
         </div>
       </div>
-
-      {/* Buys remaining */}
-      <div style={{textAlign:"center"}}>
-        <div style={{fontSize:22,fontWeight:800,lineHeight:1,fontFamily:"Georgia,serif",
-          color:buysLeft===0?"#5a3a3a":buysLeft===1?"#c06030":"#4a9060"}}>
-          {buysLeft}
-        </div>
-        <div style={{fontSize:7,color:"#3a6050",letterSpacing:1,textTransform:"uppercase",marginTop:2}}>
-          buys left
-        </div>
+      <div style={{textAlign:"center",minWidth:30}}>
+        <div style={{fontSize:18,fontWeight:800,lineHeight:1,fontFamily:"Georgia,serif",
+          color:buysLeft===0?"#5a3a3a":buysLeft===1?"#c06030":"#4a9060"}}>{buysLeft}</div>
+        <div style={{fontSize:6,color:"#3a6050",letterSpacing:0.5,textTransform:"uppercase"}}>buys</div>
       </div>
     </div>
   );
@@ -853,15 +880,15 @@ export default function ContractRummy(){
       fontFamily:"Georgia,'Times New Roman',serif",color:"#e8dfc8",
       padding:"env(safe-area-inset-top, 6px) env(safe-area-inset-right, 8px) env(safe-area-inset-bottom, 6px) env(safe-area-inset-left, 8px)",
       boxSizing:"border-box",
-      display:"flex",flexDirection:"column",gap:5,
+      display:"flex",flexDirection:"column",gap:4,
       overflow:"hidden",
     }}>
 
       {/* ── Top bar: title + scores + round pills ── */}
       <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
         <div style={{flex:1,minWidth:140}}>
-          <div style={{fontSize:7,letterSpacing:3,color:"#6aaa7a",textTransform:"uppercase"}}>Amerikano</div>
-          <div style={{fontSize:13,fontWeight:700,color:"#d4a017",lineHeight:1.2}}>
+          <div style={{fontSize:6,letterSpacing:2,color:"#6aaa7a",textTransform:"uppercase"}}>Amerikano</div>
+          <div style={{fontSize:12,fontWeight:700,color:"#d4a017",lineHeight:1.2}}>
             R{state.roundIndex+1}/7 · {contract.desc}
           </div>
         </div>
@@ -1006,7 +1033,7 @@ export default function ContractRummy(){
 
       {/* ── Player hand — BOTTOM ── */}
       <div style={{
-        background:"rgba(0,0,0,0.28)",borderRadius:10,padding:"7px 10px",
+        background:"rgba(0,0,0,0.28)",borderRadius:10,padding:"5px 8px",
         border:`1.5px solid ${inFirst?"#c0392b":alreadyDown?"rgba(212,160,23,0.6)":state.stagingGroups.length?"#4a90d9":"rgba(212,160,23,0.18)"}`,
         boxShadow:inFirst?"0 0 12px rgba(192,57,43,0.25)":alreadyDown?"0 0 10px rgba(212,160,23,0.15)":state.stagingGroups.length?"0 0 8px rgba(74,144,217,0.15)":"none",
       }}>
@@ -1021,7 +1048,7 @@ export default function ContractRummy(){
         <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",
           marginBottom:6,flexWrap:"wrap",gap:5}}>
           <div style={{display:"flex",alignItems:"center",gap:7,flexWrap:"wrap"}}>
-            <span style={{fontSize:10,letterSpacing:1.5,color:"#d4a017",textTransform:"uppercase",fontWeight:700}}>
+            <span style={{fontSize:9,letterSpacing:1,color:"#d4a017",textTransform:"uppercase",fontWeight:700}}>
               Your Hand ({state.hands[0].length})
             </span>
             {inFirst&&<span style={{fontSize:9,color:"#e74c3c",fontWeight:700}}>SELECT 1 TO DISCARD FIRST</span>}
