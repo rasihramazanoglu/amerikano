@@ -629,7 +629,7 @@ function StagingArea({stagingGroups,hand,contract,onDisband,canDisband}){
   const needed=contract.sets+contract.runs;
   return(
     <div style={{background:"rgba(74,144,217,0.07)",border:"1px dashed #4a90d9",
-      borderRadius:8,padding:"6px 10px",marginBottom:6}}>
+      borderRadius:8,padding:"4px 8px",marginBottom:4,flexShrink:0}}>
       <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:5}}>
         <span style={{fontSize:9,letterSpacing:1.5,color:"#4a90d9",textTransform:"uppercase",fontWeight:700}}>
           Staged Groups ({stagingGroups.length}/{needed})
@@ -889,7 +889,7 @@ export default function ContractRummy(){
     }}>
 
       {/* ── Top bar: title + scores + round pills ── */}
-      <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
+      <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap",flexShrink:0}}>
         <div style={{flex:1,minWidth:140}}>
           <div style={{fontSize:6,letterSpacing:2,color:"#6aaa7a",textTransform:"uppercase"}}>Amerikano</div>
           <div style={{fontSize:12,fontWeight:700,color:"#d4a017",lineHeight:1.2}}>
@@ -922,10 +922,10 @@ export default function ContractRummy(){
       </div>
 
       {/* ── Player 3 — TOP ── */}
-      <OpponentPanel {...sharedPanelProps(0,"top")}/>
+      <div style={{flexShrink:0}}><OpponentPanel {...sharedPanelProps(0,"top")}/></div>
 
       {/* ── Middle row: LEFT · Table CENTER · RIGHT ── */}
-      <div style={{display:"flex",gap:5,alignItems:"stretch",flex:1}}>
+      <div style={{display:"flex",gap:5,alignItems:"stretch",flex:1,minHeight:0}}>
 
         {/* Marco — LEFT */}
         <OpponentPanel {...sharedPanelProps(1,"left")}/>
@@ -952,7 +952,8 @@ export default function ContractRummy(){
             border:discardHover?"2px dashed #b05020":"1px solid rgba(255,255,255,0.05)",
             boxShadow:discardHover?"0 0 20px rgba(176,80,32,0.25)":"none",
             transition:"background 0.15s,border 0.15s,box-shadow 0.15s",
-
+            overflow:"hidden",
+            minHeight:0,
           }}>
 
           {/* Deck + Discard */}
@@ -1001,7 +1002,7 @@ export default function ContractRummy(){
 
           {/* All melds on table */}
           {(state.melds[0].length>0||state.melds[1].length>0||state.melds[2].length>0||state.melds[3].length>0)&&(
-            <div style={{display:"flex",flexDirection:"column",gap:5}}>
+            <div style={{display:"flex",flexDirection:"column",gap:4,overflowY:"auto",flex:1,minHeight:0}}>
               {[[0,"player","You"],[1,"ai0",AI_NAMES[0]],[2,"ai1",AI_NAMES[1]],[3,"ai2",AI_NAMES[2]]].map(([pi,ot,lbl])=>(
                 state.melds[pi].length>0&&(
                   <div key={pi}>
@@ -1018,11 +1019,11 @@ export default function ContractRummy(){
           {/* Action log */}
           {(state.actionLog||[]).length>0&&(
             <div style={{borderTop:"1px solid rgba(255,255,255,0.05)",paddingTop:5,marginTop:4}}>
-              {(state.actionLog||[]).map((entry,i)=>(
+              {(state.actionLog||[]).slice(0,2).map((entry,i)=>(
                 <div key={i} style={{
-                  fontSize:9,color:i===0?"#c8dfc0":"#4a6a58",
-                  fontStyle:"italic",lineHeight:1.6,
-                  opacity:Math.max(0.2, 1-(i*0.2)),
+                  fontSize:8,color:i===0?"#c8dfc0":"#4a6a58",
+                  fontStyle:"italic",lineHeight:1.4,
+                  opacity:i===0?1:0.4,
                 }}>
                   {i===0?"›":""} {entry}
                 </div>
@@ -1038,6 +1039,7 @@ export default function ContractRummy(){
       {/* ── Player hand — BOTTOM ── */}
       <div style={{
         background:"rgba(0,0,0,0.28)",borderRadius:10,padding:"5px 8px",
+        flexShrink:0,
         border:`1.5px solid ${inFirst?"#c0392b":alreadyDown?"rgba(212,160,23,0.6)":state.stagingGroups.length?"#4a90d9":"rgba(212,160,23,0.18)"}`,
         boxShadow:inFirst?"0 0 12px rgba(192,57,43,0.25)":alreadyDown?"0 0 10px rgba(212,160,23,0.15)":state.stagingGroups.length?"0 0 8px rgba(74,144,217,0.15)":"none",
       }}>
