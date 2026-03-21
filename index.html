@@ -2,8 +2,8 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-    <meta name="theme-color" content="#0b2b1a" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no" />
+    <meta name="theme-color" content="#071c0f" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="Amerikano" />
@@ -11,8 +11,22 @@
     <link rel="apple-touch-icon" href="/icon.svg" />
     <title>Amerikano — Contract Rummy</title>
     <style>
-      * { -webkit-tap-highlight-color: transparent; box-sizing: border-box; }
-      body { margin: 0; overscroll-behavior: none; }
+      *, *::before, *::after { -webkit-tap-highlight-color: transparent; box-sizing: border-box; margin: 0; padding: 0; }
+      html {
+        height: 100%;
+        background: #071c0f;
+      }
+      body {
+        height: 100%;
+        width: 100%;
+        background: #071c0f;
+        overscroll-behavior: none;
+        overflow: hidden;
+      }
+      #root {
+        height: 100%;
+        width: 100%;
+      }
     </style>
   </head>
   <body>
