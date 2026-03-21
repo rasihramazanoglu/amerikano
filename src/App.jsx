@@ -557,89 +557,23 @@ function reducer(state,action){
 }
 
 // ── Drag reorder ──────────────────────────────────────────────────────────────
-// ── Unified pointer drag — works on mouse AND touch ──────────────────────────
-function usePointerDrag(dispatch, draggingCardId, setDiscardHover) {
-  const dragFromIdx = useRef(null);
-  const dragActive = useRef(false);
-
-  const onPointerDown = (i, cardId, isStaged) => (e) => {
-    if(isStaged) return;
-    // Only start drag on long-press or if already moving — short taps are handled by onClick
-    dragFromIdx.current = i;
-    draggingCardId.current = cardId;
-    dragActive.current = false;
-    e.currentTarget.setPointerCapture(e.pointerId);
-  };
-
-  const onPointerMove = (i) => (e) => {
-    if(draggingCardId.current === null) return;
-    if(!dragActive.current) {
-      // Need some movement before activating drag (prevents tap conflicts)
-      dragActive.current = true;
-    }
-    // Reorder: find card under pointer
-    const el = document.elementFromPoint(e.clientX, e.clientY);
-    const cardEl = el?.closest('[data-cardidx]');
-    if(cardEl) {
-      const toIdx = parseInt(cardEl.dataset.cardidx);
-      if(dragFromIdx.current !== null && dragFromIdx.current !== toIdx) {
-        dispatch({type:"REORDER_HAND", from:dragFromIdx.current, to:toIdx});
-        dragFromIdx.current = toIdx;
+function useDragReorder(dispatch){
+  const dragFrom=useRef(null);
+  const isDiscarding=useRef(false);
+  return{
+    onDragStart:(i)=>{dragFrom.current=i; isDiscarding.current=false;},
+    onDragOver:(e,i)=>{
+      e.preventDefault();
+      if(isDiscarding.current) return;
+      if(dragFrom.current!==null&&dragFrom.current!==i){
+        dispatch({type:"REORDER_HAND",from:dragFrom.current,to:i});
+        dragFrom.current=i;
       }
-    }
-    // Check if over discard zone
-    const centerZone = document.getElementById('center-table');
-    const overCenter = centerZone && centerZone.contains(el);
-    setDiscardHover(overCenter);
+    },
+    onDragEnd:()=>{dragFrom.current=null; isDiscarding.current=false;},
+    setDiscarding:(v)=>{isDiscarding.current=v;},
   };
-
-  const onPointerUp = (canMeld, stagingGroups, dispatchFn) => (e) => {
-    if(!dragActive.current) {
-      // Was a tap not a drag — clear and let onClick handle it
-      draggingCardId.current = null;
-      dragFromIdx.current = null;
-      return;
-    }
-    const el = document.elementFromPoint(e.clientX, e.clientY);
-    const centerZone = document.getElementById('center-table');
-    if(centerZone && centerZone.contains(el) && draggingCardId.current && canMeld) {
-      const cid = draggingCardId.current;
-      if(!stagingGroups.flat().includes(cid)) {
-        dispatchFn({type:"DISCARD_BY_ID", id:cid});
-      }
-    }
-    draggingCardId.current = null;
-    dragFromIdx.current = null;
-    dragActive.current = false;
-    setDiscardHover(false);
-  };
-
-  // Keep HTML5 drag for desktop as fallback
-  const onDragStart = (i, cardId) => (e) => {
-    dragFromIdx.current = i;
-    draggingCardId.current = cardId;
-    e.dataTransfer.setData('cardId', cardId);
-  };
-  const onDragOver = (i) => (e) => {
-    e.preventDefault();
-    if(dragFromIdx.current !== null && dragFromIdx.current !== i) {
-      dispatch({type:"REORDER_HAND", from:dragFromIdx.current, to:i});
-      dragFromIdx.current = i;
-    }
-  };
-  const onDragEnd = () => {
-    draggingCardId.current = null;
-    dragFromIdx.current = null;
-    setDiscardHover(false);
-  };
-  const setDiscarding = () => {};
-
-  return { onPointerDown, onPointerMove, onPointerUp, onDragStart, onDragOver, onDragEnd, setDiscarding };
 }
-
-// Legacy aliases so existing code compiles
-function useDragReorder(dispatch){ return { onDragStart:()=>{}, onDragOver:()=>{}, onDragEnd:()=>{}, setDiscarding:()=>{} }; }
-function useTouchReorder(){ return { onTouchStart:()=>()=>{}, onTouchMove:()=>{}, onTouchEnd:()=>{} }; }
 
 // ── Card ──────────────────────────────────────────────────────────────────────
 const CW=54,CH=80; // slightly larger for easier touch
@@ -666,7 +600,7 @@ function Card({card,selected,staged,onClick,faceDown,small,draggable,onDragStart
       onClick={onClick} style={{width:CW,height:CH,borderRadius:6,flexShrink:0,
         background:bg,border,boxShadow:shadow,position:"relative",
         transform:`translateY(${ty}px)`,transition:"transform 0.12s,box-shadow 0.12s",
-        cursor:onClick?"pointer":"default",userSelect:"none",overflow:"hidden",touchAction:"none"}}>
+        cursor:onClick?"pointer":"default",userSelect:"none",overflow:"hidden"}}>
       {/* Top-left: rank only */}
       <div style={{position:"absolute",top:3,left:4,fontSize:15,fontWeight:800,
         color,fontFamily:"Georgia,serif",lineHeight:1}}>
@@ -843,52 +777,13 @@ function Btn({label,color,disabled,onClick,title}){
   );
 }
 
-// ── Fullscreen & mobile utils ─────────────────────────────────────────────────
-function useFullscreen() {
-  const [isFs, setIsFs] = useState(false);
-  useEffect(() => {
-    const handler = () => setIsFs(!!document.fullscreenElement);
-    document.addEventListener('fullscreenchange', handler);
-    return () => document.removeEventListener('fullscreenchange', handler);
-  }, []);
-  const toggle = () => {
-    if (!document.fullscreenElement) {
-      document.documentElement.requestFullscreen?.().catch(()=>{});
-    } else {
-      document.exitFullscreen?.();
-    }
-  };
-  return { isFs, toggle };
-}
-
-function useIsMobile() {
-  const [mobile, setMobile] = useState(window.innerWidth < 900);
-  useEffect(() => {
-    const h = () => setMobile(window.innerWidth < 900);
-    window.addEventListener('resize', h);
-    return () => window.removeEventListener('resize', h);
-  }, []);
-  return mobile;
-}
-
 // ── App ───────────────────────────────────────────────────────────────────────
 export default function ContractRummy(){
   const[state,dispatch]=useReducer(reducer,undefined,initialState);
   const draggingCardId = useRef(null);
   const [discardHover, setDiscardHover] = useState(false);
   const drag=useDragReorder(dispatch);
-  const touch=useTouchReorder();
-  const pd=usePointerDrag(dispatch, draggingCardId, setDiscardHover);
   const contract=CONTRACTS[state.roundIndex];
-  const { isFs, toggle: toggleFs } = useFullscreen();
-  const isMobile = useIsMobile();
-  // Tap-to-discard: on mobile, tapping center when 1 non-staged card selected discards it
-  const tapCenterToDiscard = () => {
-    if(!canMeld||state.selectedCards.length!==1) return;
-    const cid = state.selectedCards[0];
-    if(!state.stagingGroups.flat().includes(cid))
-      dispatch({type:"DISCARD_BY_ID", id:cid});
-  };
 
   useEffect(()=>{
     if(state.aiTurnPending&&!state.roundOver){
@@ -949,63 +844,55 @@ export default function ContractRummy(){
   });
 
   // Meld labels use actual player names
-  const meldLabels = [[0,"player","You"],[1,"ai0",AI_NAMES[0]],[2,"ai1",AI_NAMES[1]],[3,"ai2",AI_NAMES[2]]];
+
 
   return(
     <div style={{
-      height:"100dvh",
+      minHeight:"100vh",
       background:"radial-gradient(ellipse at 50% 0%,#1b4d30 0%,#0b2b1a 55%,#071c0f 100%)",
       fontFamily:"Georgia,'Times New Roman',serif",color:"#e8dfc8",
-      padding:"4px 6px",boxSizing:"border-box",
-      display:"flex",flexDirection:"column",gap:4,
-      overflow:"hidden",
+      padding:"6px 8px",boxSizing:"border-box",
+      display:"flex",flexDirection:"column",gap:5,
     }}>
 
-      {/* ── Top bar ── */}
-      <div style={{display:"flex",alignItems:"center",gap:6,flexShrink:0}}>
-        <div style={{flex:1}}>
-          <div style={{fontSize:6,letterSpacing:3,color:"#6aaa7a",textTransform:"uppercase"}}>Amerikano</div>
-          <div style={{fontSize:12,fontWeight:700,color:"#d4a017",lineHeight:1.2}}>
+      {/* ── Top bar: title + scores + round pills ── */}
+      <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
+        <div style={{flex:1,minWidth:140}}>
+          <div style={{fontSize:7,letterSpacing:3,color:"#6aaa7a",textTransform:"uppercase"}}>Amerikano</div>
+          <div style={{fontSize:13,fontWeight:700,color:"#d4a017",lineHeight:1.2}}>
             R{state.roundIndex+1}/7 · {contract.desc}
           </div>
         </div>
-        {/* Scores */}
-        <div style={{display:"flex",gap:5,background:"rgba(0,0,0,0.3)",borderRadius:8,
-          padding:"3px 8px",border:"1px solid rgba(255,255,255,0.07)"}}>
+        <div style={{display:"flex",gap:6,background:"rgba(0,0,0,0.3)",borderRadius:8,
+          padding:"4px 10px",border:"1px solid rgba(255,255,255,0.07)"}}>
           {[["You",0],...AI_NAMES.map((n,i)=>[n,i+1])].map(([name,idx])=>(
-            <div key={idx} style={{textAlign:"center",minWidth:28}}>
-              <div style={{fontSize:6,color:"#6aaa7a",textTransform:"uppercase",letterSpacing:0.3,whiteSpace:"nowrap",overflow:"hidden",maxWidth:36,textOverflow:"ellipsis"}}>{name}</div>
-              <div style={{fontSize:13,fontWeight:700,
+            <div key={idx} style={{textAlign:"center",minWidth:30}}>
+              <div style={{fontSize:7,color:"#6aaa7a",textTransform:"uppercase",letterSpacing:0.5}}>{name}</div>
+              <div style={{fontSize:14,fontWeight:700,
                 color:state.turn===(idx===0?"player":`ai${idx-1}`)?"#d4a017":"#e8dfc8"}}>
                 {state.gameScores[idx]}
               </div>
             </div>
           ))}
         </div>
-        {/* Round pills */}
         <div style={{display:"flex",gap:2}}>
           {CONTRACTS.map((_,i)=>(
-            <div key={i} style={{width:16,height:16,borderRadius:"50%",
-              display:"flex",alignItems:"center",justifyContent:"center",fontSize:7,fontWeight:700,
+            <div key={i} style={{width:18,height:18,borderRadius:"50%",
+              display:"flex",alignItems:"center",justifyContent:"center",fontSize:8,fontWeight:700,
               background:i===state.roundIndex?"rgba(212,160,23,0.25)":"rgba(0,0,0,0.2)",
               border:`1px solid ${i===state.roundIndex?"#d4a017":i<state.roundIndex?"#2a5a3a":"rgba(255,255,255,0.08)"}`,
               color:i===state.roundIndex?"#d4a017":i<state.roundIndex?"#3a7a4a":"#4a6a58",
             }}>{i+1}</div>
           ))}
         </div>
-        {/* Fullscreen button */}
-        <button onClick={toggleFs} style={{
-          background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.12)",
-          borderRadius:6,color:"#7ab88a",fontSize:14,padding:"4px 8px",
-          cursor:"pointer",flexShrink:0,lineHeight:1,
-        }}>{isFs?"⊠":"⛶"}</button>
+
       </div>
 
       {/* ── Player 3 — TOP ── */}
-      <div style={{flexShrink:0}}><OpponentPanel {...sharedPanelProps(0,"top")}/></div>
+      <OpponentPanel {...sharedPanelProps(0,"top")}/>
 
-      {/* ── Middle row ── */}
-      <div style={{display:"flex",gap:4,alignItems:"stretch",flex:1,minHeight:0}}>
+      {/* ── Middle row: LEFT · Table CENTER · RIGHT ── */}
+      <div style={{display:"flex",gap:5,alignItems:"stretch",flex:1}}>
 
         {/* Marco — LEFT */}
         <OpponentPanel {...sharedPanelProps(1,"left")}/>
@@ -1013,10 +900,9 @@ export default function ContractRummy(){
         {/* ── Table center — also a discard drop zone ── */}
         <div
           id="center-table"
-          onClick={isMobile&&canMeld&&state.selectedCards.length===1?tapCenterToDiscard:undefined}
-          onDragEnter={(e)=>{ e.preventDefault(); if(draggingCardId.current&&canMeld) setDiscardHover(true); }}
+          onDragEnter={(e)=>{ e.preventDefault(); if(draggingCardId.current&&canMeld){ setDiscardHover(true); drag.setDiscarding(true); }}}
           onDragOver={(e)=>{ e.preventDefault(); if(draggingCardId.current&&canMeld) setDiscardHover(true); }}
-          onDragLeave={(e)=>{ if(!e.currentTarget.contains(e.relatedTarget)) setDiscardHover(false); }}
+          onDragLeave={(e)=>{ if(!e.currentTarget.contains(e.relatedTarget)){ setDiscardHover(false); drag.setDiscarding(false); }}}
           onDrop={(e)=>{
             e.preventDefault();
             const cid = draggingCardId.current;
@@ -1025,15 +911,15 @@ export default function ContractRummy(){
             }
             setDiscardHover(false);
             draggingCardId.current=null;
+            drag.setDiscarding(false);
           }}
           style={{flex:1,display:"flex",flexDirection:"column",gap:4,
-            background:discardHover?"rgba(176,80,32,0.12)":canMeld&&state.selectedCards.length===1?"rgba(80,60,10,0.15)":"rgba(0,0,0,0.15)",
+            background:discardHover?"rgba(176,80,32,0.12)":"rgba(0,0,0,0.15)",
             borderRadius:12,padding:"6px 8px",
-            border:discardHover?"2px dashed #b05020":canMeld&&state.selectedCards.length===1&&isMobile?"1px dashed rgba(176,80,32,0.4)":"1px solid rgba(255,255,255,0.05)",
+            border:discardHover?"2px dashed #b05020":"1px solid rgba(255,255,255,0.05)",
             boxShadow:discardHover?"0 0 20px rgba(176,80,32,0.25)":"none",
             transition:"background 0.15s,border 0.15s,box-shadow 0.15s",
-            cursor:isMobile&&canMeld&&state.selectedCards.length===1?"pointer":"default",
-            overflowY:"auto",
+
           }}>
 
           {/* Deck + Discard */}
@@ -1083,7 +969,7 @@ export default function ContractRummy(){
           {/* All melds on table */}
           {(state.melds[0].length>0||state.melds[1].length>0||state.melds[2].length>0||state.melds[3].length>0)&&(
             <div style={{display:"flex",flexDirection:"column",gap:5}}>
-              {meldLabels.map(([pi,ot,lbl])=>(
+              {[[0,"player","You"],[1,"ai0",AI_NAMES[0]],[2,"ai1",AI_NAMES[1]],[3,"ai2",AI_NAMES[2]]].map(([pi,ot,lbl])=>(
                 state.melds[pi].length>0&&(
                   <div key={pi}>
                     <div style={{fontSize:7,color:pi===0?"#d4a017":"#7ab88a",
@@ -1118,7 +1004,7 @@ export default function ContractRummy(){
 
       {/* ── Player hand — BOTTOM ── */}
       <div style={{
-        background:"rgba(0,0,0,0.28)",borderRadius:10,padding:"5px 8px",flexShrink:0,
+        background:"rgba(0,0,0,0.28)",borderRadius:10,padding:"7px 10px",
         border:`1.5px solid ${inFirst?"#c0392b":alreadyDown?"rgba(212,160,23,0.6)":state.stagingGroups.length?"#4a90d9":"rgba(212,160,23,0.18)"}`,
         boxShadow:inFirst?"0 0 12px rgba(192,57,43,0.25)":alreadyDown?"0 0 10px rgba(212,160,23,0.15)":state.stagingGroups.length?"0 0 8px rgba(74,144,217,0.15)":"none",
       }}>
@@ -1181,12 +1067,9 @@ export default function ContractRummy(){
                   }}
                   data-cardidx={i}
                   draggable={!isStaged}
-                  onPointerDown={!isStaged?pd.onPointerDown(i,card.id,isStaged):undefined}
-                  onPointerMove={!isStaged?pd.onPointerMove(i):undefined}
-                  onPointerUp={!isStaged?pd.onPointerUp(canMeld,state.stagingGroups,dispatch):undefined}
-                  onDragStart={!isStaged?(e)=>pd.onDragStart(i,card.id)(e):undefined}
-                  onDragOver={!isStaged?(e)=>pd.onDragOver(i)(e):undefined}
-                  onDragEnd={!isStaged?pd.onDragEnd:undefined}
+                  onDragStart={!isStaged?(e)=>{ drag.onDragStart(i); draggingCardId.current=card.id; e.dataTransfer.setData('cardId',card.id); }:undefined}
+                  onDragOver={!isStaged?(e)=>drag.onDragOver(e,i):undefined}
+                  onDragEnd={!isStaged?()=>{ drag.onDragEnd(); draggingCardId.current=null; setDiscardHover(false); }:undefined}
                 />
               );
             })}
@@ -1195,8 +1078,8 @@ export default function ContractRummy(){
         </div>
         <div style={{fontSize:8,color:"#3a6a4a",fontStyle:"italic",marginTop:2}}>
           {alreadyDown
-            ?isMobile?"Tap card → tap meld to lay off · or tap center table to discard":"Tap 1 card → tap a meld above to lay off · Or Discard"
-            :isMobile?"Select cards → Stage → Go Down · Tap center table to discard":"Select cards → Stage · Stage all groups → Go Down ↓ · Tap staged group to disband"}
+            ?"Tap 1 card → tap a meld above to lay off · Or Discard"
+            :"Select cards → Stage · Stage all groups → Go Down ↓ · Tap staged group to disband"}
         </div>
       </div>
 
