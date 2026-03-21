@@ -967,34 +967,34 @@ export default function ContractRummy(){
         </div>
       </div>
 
-      {/* ── FELT AREA — absolute positioned opponents + floating center ── */}
-      <div style={{position:"relative",overflow:"hidden"}}>
-
-        {/* PLAYER 3 — TOP CENTER */}
-        <div style={{position:"absolute",top:0,left:"50%",transform:"translateX(-50%)",display:"flex",flexDirection:"column",alignItems:"center",gap:2}}>
+      {/* ── FELT AREA — 3×3 grid: corners empty, edges = players, center = table ── */}
+      <div style={{
+        display:"grid",
+        gridTemplateColumns:"auto 1fr auto",
+        gridTemplateRows:"auto 1fr auto",
+        gap:8,
+        flex:1,
+        minHeight:0,
+        alignItems:"center",
+        justifyItems:"center",
+      }}>
+        {/* Row 1 */}
+        <div/>{/* top-left empty */}
+        <div style={{display:"flex",justifyContent:"center"}}>
           <FeltPlayer name="Player 3" hand={state.hands[1]} melds={state.melds[1]}
             metContract={state.metContract[1]} isTurn={state.turn==="ai0"}
             buysUsed={state.buysUsed[1]} ownerTurn="ai0"
             onLayoff={onLayoff} canLayoff={canLayoff} layoffCard={layoffCard}/>
         </div>
+        <div/>{/* top-right empty */}
 
-        {/* PLAYER 2 — LEFT */}
-        <div style={{position:"absolute",top:"50%",left:0,transform:"translateY(-50%)",display:"flex",flexDirection:"column",alignItems:"center",gap:2}}>
-          <FeltPlayer name="Player 2" hand={state.hands[2]} melds={state.melds[2]}
-            metContract={state.metContract[2]} isTurn={state.turn==="ai1"}
-            buysUsed={state.buysUsed[2]} ownerTurn="ai1"
-            onLayoff={onLayoff} canLayoff={canLayoff} layoffCard={layoffCard}/>
-        </div>
+        {/* Row 2 */}
+        <FeltPlayer name="Player 2" hand={state.hands[2]} melds={state.melds[2]}
+          metContract={state.metContract[2]} isTurn={state.turn==="ai1"}
+          buysUsed={state.buysUsed[2]} ownerTurn="ai1"
+          onLayoff={onLayoff} canLayoff={canLayoff} layoffCard={layoffCard}/>
 
-        {/* PLAYER 4 — RIGHT */}
-        <div style={{position:"absolute",top:"50%",right:0,transform:"translateY(-50%)",display:"flex",flexDirection:"column",alignItems:"center",gap:2}}>
-          <FeltPlayer name="Player 4" hand={state.hands[3]} melds={state.melds[3]}
-            metContract={state.metContract[3]} isTurn={state.turn==="ai2"}
-            buysUsed={state.buysUsed[3]} ownerTurn="ai2"
-            onLayoff={onLayoff} canLayoff={canLayoff} layoffCard={layoffCard}/>
-        </div>
-
-        {/* CENTER — deck, discard, melds, message */}
+        {/* CENTER CELL */}
         <div
           id="center-table"
           onDragEnter={(e)=>{ e.preventDefault(); if(draggingCardId.current&&canMeld){ setDiscardHover(true); drag.setDiscarding(true); }}}
@@ -1002,29 +1002,34 @@ export default function ContractRummy(){
           onDragLeave={(e)=>{ if(!e.currentTarget.contains(e.relatedTarget)){ setDiscardHover(false); drag.setDiscarding(false); }}}
           onDrop={(e)=>{ e.preventDefault(); const cid=draggingCardId.current; if(cid&&canMeld&&!state.stagingGroups.flat().includes(cid)) dispatch({type:"DISCARD_BY_ID",id:cid}); setDiscardHover(false); draggingCardId.current=null; drag.setDiscarding(false); }}
           style={{
-            position:"absolute",top:"50%",left:"50%",transform:"translate(-50%,-50%)",
-            display:"flex",flexDirection:"column",alignItems:"center",gap:6,
-            minWidth:160,
+            width:"100%",height:"100%",
+            display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",
+            gap:6,padding:"4px",
+            background:discardHover?"rgba(176,80,32,0.08)":"transparent",
+            borderRadius:12,
+            border:discardHover?"2px dashed rgba(176,80,32,0.5)":"2px solid transparent",
+            transition:"background 0.15s,border 0.15s",
           }}>
 
           {/* Deck + Discard */}
-          <div style={{display:"flex",gap:12,alignItems:"flex-end"}}>
+          <div style={{display:"flex",gap:14,alignItems:"flex-end"}}>
             <div style={{textAlign:"center"}}>
               <div onClick={canDraw?()=>dispatch({type:"DRAW_DECK"}):undefined}
-                style={{opacity:canDraw?1:0.4,cursor:canDraw?"pointer":"default",transition:"opacity 0.2s",filter:canDraw?"drop-shadow(0 0 6px rgba(212,160,23,0.5))":"none"}}>
+                style={{opacity:canDraw?1:0.4,cursor:canDraw?"pointer":"default",transition:"opacity 0.2s",
+                  filter:canDraw?"drop-shadow(0 0 6px rgba(212,160,23,0.5))":"none"}}>
                 <Card card={{rank:"",suit:""}} faceDown/>
               </div>
               <div style={{fontSize:7,color:"#5a9a6a",marginTop:3,letterSpacing:1}}>DECK · {state.deck.length}</div>
             </div>
             <div style={{textAlign:"center"}}>
-              <div
-                onClick={canDraw?()=>dispatch({type:"DRAW_DISCARD"}):undefined}
-                style={{opacity:canDraw?1:discardHover?1:0.85,cursor:canDraw?"pointer":"default",
-                  filter:discardHover?"drop-shadow(0 0 8px rgba(176,80,32,0.8))":canDraw?"drop-shadow(0 0 4px rgba(212,160,23,0.3))":"none",
+              <div onClick={canDraw?()=>dispatch({type:"DRAW_DISCARD"}):undefined}
+                style={{cursor:canDraw?"pointer":"default",
+                  filter:discardHover?"drop-shadow(0 0 10px rgba(176,80,32,0.9))":canDraw?"drop-shadow(0 0 4px rgba(212,160,23,0.3))":"none",
                   transition:"filter 0.15s"}}>
                 {topDiscard
                   ?<Card card={topDiscard}/>
-                  :<div style={{width:CW,height:CH,borderRadius:6,border:"1.5px dashed rgba(255,255,255,0.15)",display:"flex",alignItems:"center",justifyContent:"center",color:"rgba(255,255,255,0.2)",fontSize:16}}>∅</div>
+                  :<div style={{width:CW,height:CH,borderRadius:6,border:"1.5px dashed rgba(255,255,255,0.15)",
+                     display:"flex",alignItems:"center",justifyContent:"center",color:"rgba(255,255,255,0.2)",fontSize:16}}>∅</div>
                 }
               </div>
               <div style={{fontSize:7,color:discardHover?"#b05020":"#5a9a6a",marginTop:3,letterSpacing:1,fontWeight:discardHover?700:400}}>
@@ -1034,31 +1039,43 @@ export default function ContractRummy(){
           </div>
 
           {/* Turn badge + message */}
-          <div style={{textAlign:"center",maxWidth:220}}>
+          <div style={{textAlign:"center",maxWidth:240}}>
             <div style={{display:"inline-block",padding:"2px 10px",borderRadius:12,marginBottom:3,
               background:isPlayer?"rgba(212,160,23,0.15)":"rgba(106,170,122,0.1)",
               border:`1px solid ${isPlayer?"#d4a017":"#5a9a6a"}`,
               fontSize:8,letterSpacing:1,color:isPlayer?"#d4a017":"#7ab88a",fontWeight:700}}>
               {isPlayer?"YOUR TURN":`${turnName(state.turn).toUpperCase()}'S TURN`}
             </div>
-            <div style={{fontSize:9,color:"#8ab8a0",fontStyle:"italic",lineHeight:1.3}}>{state.message}</div>
+            <div style={{fontSize:9,color:"#8ab8a0",fontStyle:"italic",lineHeight:1.3,marginTop:2}}>{state.message}</div>
           </div>
 
-          {/* Your melds on table */}
-          {state.melds[0].length>0&&(
-            <div style={{textAlign:"center"}}>
-              <div style={{fontSize:7,color:"#d4a017",letterSpacing:1,textTransform:"uppercase",marginBottom:3}}>Your Melds</div>
-              <MeldZone melds={state.melds[0]} ownerTurn="player" onLayoff={onLayoff} canLayoff={canLayoff} layoffCard={layoffCard}/>
+          {/* All melds on table — scrollable */}
+          {state.melds.some(m=>m.length>0)&&(
+            <div style={{display:"flex",flexDirection:"column",gap:4,overflowY:"auto",maxHeight:"40%",width:"100%",alignItems:"center"}}>
+              {[[0,"player","You"],[1,"ai0","Player 3"],[2,"ai1","Player 2"],[3,"ai2","Player 4"]].map(([pi,ot,lbl])=>(
+                state.melds[pi].length>0&&(
+                  <div key={pi} style={{textAlign:"center"}}>
+                    <div style={{fontSize:7,color:pi===0?"#d4a017":"#5a9a6a",letterSpacing:1,textTransform:"uppercase",marginBottom:2}}>{lbl}</div>
+                    <MeldZone melds={state.melds[pi]} ownerTurn={ot} onLayoff={onLayoff} canLayoff={canLayoff} layoffCard={layoffCard}/>
+                  </div>
+                )
+              ))}
             </div>
           )}
 
-          {/* Action log — just latest */}
+          {/* Action log */}
           {(state.actionLog||[]).length>0&&(
-            <div style={{fontSize:8,color:"#4a7a58",fontStyle:"italic"}}>
-              › {state.actionLog[0]}
-            </div>
+            <div style={{fontSize:8,color:"#4a7a58",fontStyle:"italic"}}>› {state.actionLog[0]}</div>
           )}
         </div>
+
+        <FeltPlayer name="Player 4" hand={state.hands[3]} melds={state.melds[3]}
+          metContract={state.metContract[3]} isTurn={state.turn==="ai2"}
+          buysUsed={state.buysUsed[3]} ownerTurn="ai2"
+          onLayoff={onLayoff} canLayoff={canLayoff} layoffCard={layoffCard}/>
+
+        {/* Row 3 — empty corners */}
+        <div/><div/><div/>
       </div>
 
       {/* ── BOTTOM — staging + hand + action bar ── */}
