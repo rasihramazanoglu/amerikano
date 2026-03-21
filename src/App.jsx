@@ -791,6 +791,53 @@ function OpponentPanel({name,hand,metContract,isTurn,buysUsed,position}){
   );
 }
 
+
+// ── FeltPlayer — open card table style, no box border ────────────────────────
+function FeltPlayer({name,hand,melds,metContract,isTurn,buysUsed,ownerTurn,onLayoff,canLayoff,layoffCard}){
+  const accent=isTurn?"#d4a017":"#6aaa7a";
+  const buysLeft=3-buysUsed;
+  const CWs=38,CHs=54;
+  return(
+    <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:3}}>
+      {/* Name tag */}
+      <div style={{fontSize:9,fontWeight:700,color:accent,letterSpacing:0.5,textTransform:"uppercase",
+        textShadow:"0 1px 3px rgba(0,0,0,0.8)",display:"flex",alignItems:"center",gap:4}}>
+        {isTurn&&<span style={{fontSize:7,color:"#d4a017"}}>▶</span>}
+        {name}
+        {metContract&&<span style={{fontSize:7,color:"#d4a017"}}>✓</span>}
+      </div>
+      {/* Card stack */}
+      <div style={{position:"relative",width:CWs+6,height:CHs+6,flexShrink:0}}>
+        <div style={{position:"absolute",top:5,left:5,width:CWs,height:CHs,borderRadius:5,
+          background:"linear-gradient(135deg,#0a1e12,#050f08)",border:"1px solid #152d1e"}}/>
+        <div style={{position:"absolute",top:3,left:3,width:CWs,height:CHs,borderRadius:5,
+          background:"linear-gradient(135deg,#0d2318,#071a0f)",border:"1px solid #1a4028"}}/>
+        <div style={{position:"absolute",top:0,left:0,width:CWs,height:CHs,borderRadius:5,
+          background:"linear-gradient(135deg,#1a4a2e,#0d2e1a)",
+          border:`2px solid ${isTurn?"#d4a017":"#2a6042"}`,
+          display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",
+          boxShadow:isTurn?"0 0 12px rgba(212,160,23,0.4)":"0 2px 8px rgba(0,0,0,0.6)",
+        }}>
+          <div style={{fontSize:22,fontWeight:800,color:isTurn?"#d4a017":"#4a9060",
+            fontFamily:"Georgia,serif",lineHeight:1}}>{hand.length}</div>
+          <div style={{fontSize:6,color:"#3a7050",letterSpacing:0.5,textTransform:"uppercase",marginTop:2}}>cards</div>
+        </div>
+      </div>
+      {/* Buys + melds */}
+      <div style={{display:"flex",alignItems:"center",gap:6}}>
+        <div style={{textAlign:"center"}}>
+          <div style={{fontSize:14,fontWeight:800,lineHeight:1,fontFamily:"Georgia,serif",
+            color:buysLeft===0?"#5a3a3a":buysLeft===1?"#c06030":"#4a7060"}}>{buysLeft}</div>
+          <div style={{fontSize:6,color:"#3a5a48",letterSpacing:0.5,textTransform:"uppercase"}}>buys</div>
+        </div>
+        {melds.length>0&&(
+          <MeldZone melds={melds} ownerTurn={ownerTurn} onLayoff={onLayoff} canLayoff={canLayoff} layoffCard={layoffCard}/>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ── Btn ───────────────────────────────────────────────────────────────────────
 function Btn({label,color,disabled,onClick,title}){
   return(
@@ -874,330 +921,276 @@ export default function ContractRummy(){
   // Meld labels use actual player names
 
 
+
+  // ── Felt layout — open card table style ────────────────────────────────────
+  const layoffCard = canLayoff ? state.hands[0].find(c=>c.id===state.selectedCards[0]) : null;
+  const hasMelds = state.melds.some(m=>m.length>0);
+  const canDiscardSelected = canMeld && state.selectedCards.length===1 && !stagedIds.has(state.selectedCards[0]);
+
   return(
     <div style={{
-      width:"100vw",
-      height:"100dvh",
-      maxWidth:"100vw",
-      maxHeight:"100dvh",
-      background:"radial-gradient(ellipse at 50% 0%,#1b4d30 0%,#0b2b1a 55%,#071c0f 100%)",
-      fontFamily:"Georgia,'Times New Roman',serif",color:"#e8dfc8",
+      width:"100vw", height:"100dvh",
+      background:"radial-gradient(ellipse at 40% 35%,#1e5c35 0%,#0f3320 45%,#071c0f 100%)",
+      fontFamily:"Georgia,'Times New Roman',serif", color:"#e8dfc8",
       padding:"max(env(safe-area-inset-top),4px) max(env(safe-area-inset-right),6px) max(env(safe-area-inset-bottom),4px) max(env(safe-area-inset-left),6px)",
       boxSizing:"border-box",
-      display:"flex",flexDirection:"column",gap:"1vh",
+      display:"grid",
+      gridTemplateRows:"auto 1fr auto",
       overflow:"hidden",
+      position:"relative",
     }}>
 
-      {/* ── Top bar: title + scores + round pills ── */}
-      <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap",flexShrink:0}}>
-        <div style={{flex:1,minWidth:140}}>
-          <div style={{fontSize:6,letterSpacing:2,color:"#6aaa7a",textTransform:"uppercase"}}>Amerikano</div>
-          <div style={{fontSize:12,fontWeight:700,color:"#d4a017",lineHeight:1.2}}>
-            R{state.roundIndex+1}/7 · {contract.desc}
-          </div>
+      {/* ── TOP BAR ── */}
+      <div style={{display:"flex",alignItems:"center",gap:8,padding:"2px 0",flexShrink:0}}>
+        <div style={{flex:1}}>
+          <span style={{fontSize:9,letterSpacing:2,color:"#5a9a6a",textTransform:"uppercase"}}>Amerikano · </span>
+          <span style={{fontSize:11,fontWeight:700,color:"#d4a017"}}>R{state.roundIndex+1}/7 · {contract.desc}</span>
         </div>
-        <div style={{display:"flex",gap:6,background:"rgba(0,0,0,0.3)",borderRadius:8,
-          padding:"4px 10px",border:"1px solid rgba(255,255,255,0.07)"}}>
+        {/* Scores */}
+        <div style={{display:"flex",gap:10}}>
           {[["You",0],...AI_NAMES.map((n,i)=>[n,i+1])].map(([name,idx])=>(
-            <div key={idx} style={{textAlign:"center",minWidth:30}}>
-              <div style={{fontSize:7,color:"#6aaa7a",textTransform:"uppercase",letterSpacing:0.5}}>{name}</div>
-              <div style={{fontSize:14,fontWeight:700,
-                color:state.turn===(idx===0?"player":`ai${idx-1}`)?"#d4a017":"#e8dfc8"}}>
-                {state.gameScores[idx]}
-              </div>
+            <div key={idx} style={{textAlign:"center"}}>
+              <div style={{fontSize:6,color:"#5a9a6a",textTransform:"uppercase",letterSpacing:0.5,whiteSpace:"nowrap"}}>{name}</div>
+              <div style={{fontSize:13,fontWeight:700,color:state.turn===(idx===0?"player":`ai${idx-1}`)?"#d4a017":"#e8dfc8",lineHeight:1}}>{state.gameScores[idx]}</div>
             </div>
           ))}
         </div>
+        {/* Round pills */}
         <div style={{display:"flex",gap:2}}>
           {CONTRACTS.map((_,i)=>(
-            <div key={i} style={{width:18,height:18,borderRadius:"50%",
-              display:"flex",alignItems:"center",justifyContent:"center",fontSize:8,fontWeight:700,
-              background:i===state.roundIndex?"rgba(212,160,23,0.25)":"rgba(0,0,0,0.2)",
-              border:`1px solid ${i===state.roundIndex?"#d4a017":i<state.roundIndex?"#2a5a3a":"rgba(255,255,255,0.08)"}`,
-              color:i===state.roundIndex?"#d4a017":i<state.roundIndex?"#3a7a4a":"#4a6a58",
+            <div key={i} style={{width:14,height:14,borderRadius:"50%",display:"flex",alignItems:"center",justifyContent:"center",fontSize:7,fontWeight:700,
+              background:i===state.roundIndex?"rgba(212,160,23,0.3)":"rgba(0,0,0,0.3)",
+              border:`1px solid ${i===state.roundIndex?"#d4a017":i<state.roundIndex?"#2a5a3a":"rgba(255,255,255,0.1)"}`,
+              color:i===state.roundIndex?"#d4a017":i<state.roundIndex?"#3a7a4a":"#3a5a48",
             }}>{i+1}</div>
           ))}
         </div>
-
       </div>
 
-      {/* ── Player 3 — TOP ── */}
-      <div style={{flexShrink:0}}><OpponentPanel {...sharedPanelProps(0,"top")}/></div>
+      {/* ── FELT AREA — absolute positioned opponents + floating center ── */}
+      <div style={{position:"relative",overflow:"hidden"}}>
 
-      {/* ── Middle row: LEFT · Table CENTER · RIGHT ── */}
-      <div style={{display:"flex",gap:5,alignItems:"stretch",flex:1,minHeight:0}}>
+        {/* PLAYER 3 — TOP CENTER */}
+        <div style={{position:"absolute",top:0,left:"50%",transform:"translateX(-50%)",display:"flex",flexDirection:"column",alignItems:"center",gap:2}}>
+          <FeltPlayer name="Player 3" hand={state.hands[1]} melds={state.melds[1]}
+            metContract={state.metContract[1]} isTurn={state.turn==="ai0"}
+            buysUsed={state.buysUsed[1]} ownerTurn="ai0"
+            onLayoff={onLayoff} canLayoff={canLayoff} layoffCard={layoffCard}/>
+        </div>
 
-        {/* Marco — LEFT */}
-        <OpponentPanel {...sharedPanelProps(1,"left")}/>
+        {/* PLAYER 2 — LEFT */}
+        <div style={{position:"absolute",top:"50%",left:0,transform:"translateY(-50%)",display:"flex",flexDirection:"column",alignItems:"center",gap:2}}>
+          <FeltPlayer name="Player 2" hand={state.hands[2]} melds={state.melds[2]}
+            metContract={state.metContract[2]} isTurn={state.turn==="ai1"}
+            buysUsed={state.buysUsed[2]} ownerTurn="ai1"
+            onLayoff={onLayoff} canLayoff={canLayoff} layoffCard={layoffCard}/>
+        </div>
 
-        {/* ── Table center — also a discard drop zone ── */}
+        {/* PLAYER 4 — RIGHT */}
+        <div style={{position:"absolute",top:"50%",right:0,transform:"translateY(-50%)",display:"flex",flexDirection:"column",alignItems:"center",gap:2}}>
+          <FeltPlayer name="Player 4" hand={state.hands[3]} melds={state.melds[3]}
+            metContract={state.metContract[3]} isTurn={state.turn==="ai2"}
+            buysUsed={state.buysUsed[3]} ownerTurn="ai2"
+            onLayoff={onLayoff} canLayoff={canLayoff} layoffCard={layoffCard}/>
+        </div>
+
+        {/* CENTER — deck, discard, melds, message */}
         <div
           id="center-table"
           onDragEnter={(e)=>{ e.preventDefault(); if(draggingCardId.current&&canMeld){ setDiscardHover(true); drag.setDiscarding(true); }}}
           onDragOver={(e)=>{ e.preventDefault(); if(draggingCardId.current&&canMeld) setDiscardHover(true); }}
           onDragLeave={(e)=>{ if(!e.currentTarget.contains(e.relatedTarget)){ setDiscardHover(false); drag.setDiscarding(false); }}}
-          onDrop={(e)=>{
-            e.preventDefault();
-            const cid = draggingCardId.current;
-            if(cid&&canMeld&&!state.stagingGroups.flat().includes(cid)){
-              dispatch({type:"DISCARD_BY_ID",id:cid});
-            }
-            setDiscardHover(false);
-            draggingCardId.current=null;
-            drag.setDiscarding(false);
-          }}
-          style={{flex:1,display:"flex",flexDirection:"column",gap:4,
-            background:discardHover?"rgba(176,80,32,0.12)":"rgba(0,0,0,0.15)",
-            borderRadius:12,padding:"6px 8px",
-            border:discardHover?"2px dashed #b05020":"1px solid rgba(255,255,255,0.05)",
-            boxShadow:discardHover?"0 0 20px rgba(176,80,32,0.25)":"none",
-            transition:"background 0.15s,border 0.15s,box-shadow 0.15s",
-            overflow:"hidden",
-            minHeight:0,
+          onDrop={(e)=>{ e.preventDefault(); const cid=draggingCardId.current; if(cid&&canMeld&&!state.stagingGroups.flat().includes(cid)) dispatch({type:"DISCARD_BY_ID",id:cid}); setDiscardHover(false); draggingCardId.current=null; drag.setDiscarding(false); }}
+          style={{
+            position:"absolute",top:"50%",left:"50%",transform:"translate(-50%,-50%)",
+            display:"flex",flexDirection:"column",alignItems:"center",gap:6,
+            minWidth:160,
           }}>
 
           {/* Deck + Discard */}
-          <div style={{display:"flex",justifyContent:"center",alignItems:"flex-end",gap:14}}>
+          <div style={{display:"flex",gap:12,alignItems:"flex-end"}}>
             <div style={{textAlign:"center"}}>
               <div onClick={canDraw?()=>dispatch({type:"DRAW_DECK"}):undefined}
-                style={{opacity:canDraw?1:0.35,cursor:canDraw?"pointer":"default",transition:"opacity 0.15s"}}>
+                style={{opacity:canDraw?1:0.4,cursor:canDraw?"pointer":"default",transition:"opacity 0.2s",filter:canDraw?"drop-shadow(0 0 6px rgba(212,160,23,0.5))":"none"}}>
                 <Card card={{rank:"",suit:""}} faceDown/>
               </div>
-              <div style={{fontSize:7,color:"#6aaa7a",marginTop:2,letterSpacing:1}}>DECK·{state.deck.length}</div>
+              <div style={{fontSize:7,color:"#5a9a6a",marginTop:3,letterSpacing:1}}>DECK · {state.deck.length}</div>
             </div>
             <div style={{textAlign:"center"}}>
-              {topDiscard
-                ?<div onClick={canDraw?()=>dispatch({type:"DRAW_DISCARD"}):undefined}
-                   style={{opacity:canDraw?1:0.35,cursor:canDraw?"pointer":"default"}}>
-                   <Card card={topDiscard}/>
-                 </div>
-                :<div style={{width:CW,height:CH,borderRadius:6,
-                   border:"1.5px dashed rgba(255,255,255,0.12)",
-                   display:"flex",alignItems:"center",justifyContent:"center",
-                   color:"rgba(255,255,255,0.15)",fontSize:16}}>∅</div>
-              }
-              <div style={{fontSize:7,color:"#6aaa7a",marginTop:2,letterSpacing:1}}>DISCARD</div>
+              <div
+                onClick={canDraw?()=>dispatch({type:"DRAW_DISCARD"}):undefined}
+                style={{opacity:canDraw?1:discardHover?1:0.85,cursor:canDraw?"pointer":"default",
+                  filter:discardHover?"drop-shadow(0 0 8px rgba(176,80,32,0.8))":canDraw?"drop-shadow(0 0 4px rgba(212,160,23,0.3))":"none",
+                  transition:"filter 0.15s"}}>
+                {topDiscard
+                  ?<Card card={topDiscard}/>
+                  :<div style={{width:CW,height:CH,borderRadius:6,border:"1.5px dashed rgba(255,255,255,0.15)",display:"flex",alignItems:"center",justifyContent:"center",color:"rgba(255,255,255,0.2)",fontSize:16}}>∅</div>
+                }
+              </div>
+              <div style={{fontSize:7,color:discardHover?"#b05020":"#5a9a6a",marginTop:3,letterSpacing:1,fontWeight:discardHover?700:400}}>
+                {discardHover?"DROP HERE":"DISCARD"}
+              </div>
             </div>
           </div>
 
-          {/* Drop hint */}
-          {discardHover&&canMeld&&(
-            <div style={{textAlign:"center",fontSize:11,color:"#b05020",fontWeight:700,
-              letterSpacing:1,textTransform:"uppercase",animation:"pulse 0.8s infinite"}}>
-              ↓ Drop to Discard
-            </div>
-          )}
-          {/* Turn indicator + message */}
-          <div style={{textAlign:"center"}}>
-            <div style={{display:"inline-block",padding:"2px 8px",borderRadius:4,marginBottom:3,
-              background:isPlayer?"rgba(212,160,23,0.12)":"rgba(106,170,122,0.08)",
-              border:`1px solid ${isPlayer?"#d4a017":"#6aaa7a"}`,
-              fontSize:8,letterSpacing:1,color:isPlayer?"#d4a017":"#8aca9a",fontWeight:700}}>
+          {/* Turn badge + message */}
+          <div style={{textAlign:"center",maxWidth:220}}>
+            <div style={{display:"inline-block",padding:"2px 10px",borderRadius:12,marginBottom:3,
+              background:isPlayer?"rgba(212,160,23,0.15)":"rgba(106,170,122,0.1)",
+              border:`1px solid ${isPlayer?"#d4a017":"#5a9a6a"}`,
+              fontSize:8,letterSpacing:1,color:isPlayer?"#d4a017":"#7ab88a",fontWeight:700}}>
               {isPlayer?"YOUR TURN":`${turnName(state.turn).toUpperCase()}'S TURN`}
             </div>
-            <div style={{fontSize:10,color:"#b0cabb",fontStyle:"italic",lineHeight:1.4,marginTop:2}}>
-              {state.message}
-            </div>
+            <div style={{fontSize:9,color:"#8ab8a0",fontStyle:"italic",lineHeight:1.3}}>{state.message}</div>
           </div>
 
-          {/* All melds on table */}
-          {(state.melds[0].length>0||state.melds[1].length>0||state.melds[2].length>0||state.melds[3].length>0)&&(
-            <div style={{display:"flex",flexDirection:"column",gap:4,overflowY:"auto",flex:1,minHeight:0}}>
-              {[[0,"player","You"],[1,"ai0",AI_NAMES[0]],[2,"ai1",AI_NAMES[1]],[3,"ai2",AI_NAMES[2]]].map(([pi,ot,lbl])=>(
-                state.melds[pi].length>0&&(
-                  <div key={pi}>
-                    <div style={{fontSize:7,color:pi===0?"#d4a017":"#7ab88a",
-                      letterSpacing:1,marginBottom:3,textTransform:"uppercase"}}>{lbl}</div>
-                    <MeldZone melds={state.melds[pi]} ownerTurn={ot} onLayoff={onLayoff}
-                      canLayoff={canLayoff} layoffCard={canLayoff?state.hands[0].find(c=>c.id===state.selectedCards[0]):null}/>
-                  </div>
-                )
-              ))}
+          {/* Your melds on table */}
+          {state.melds[0].length>0&&(
+            <div style={{textAlign:"center"}}>
+              <div style={{fontSize:7,color:"#d4a017",letterSpacing:1,textTransform:"uppercase",marginBottom:3}}>Your Melds</div>
+              <MeldZone melds={state.melds[0]} ownerTurn="player" onLayoff={onLayoff} canLayoff={canLayoff} layoffCard={layoffCard}/>
             </div>
           )}
 
-          {/* Action log */}
+          {/* Action log — just latest */}
           {(state.actionLog||[]).length>0&&(
-            <div style={{borderTop:"1px solid rgba(255,255,255,0.05)",paddingTop:5,marginTop:4}}>
-              {(state.actionLog||[]).slice(0,2).map((entry,i)=>(
-                <div key={i} style={{
-                  fontSize:8,color:i===0?"#c8dfc0":"#4a6a58",
-                  fontStyle:"italic",lineHeight:1.4,
-                  opacity:i===0?1:0.4,
-                }}>
-                  {i===0?"›":""} {entry}
-                </div>
-              ))}
+            <div style={{fontSize:8,color:"#4a7a58",fontStyle:"italic"}}>
+              › {state.actionLog[0]}
             </div>
           )}
         </div>
-
-        {/* Leila — RIGHT */}
-        <OpponentPanel {...sharedPanelProps(2,"right")}/>
       </div>
 
-      {/* ── Player hand — BOTTOM ── */}
-      <div style={{
-        background:"rgba(0,0,0,0.28)",borderRadius:10,padding:"5px 8px",
-        flexShrink:0,
-        border:`1.5px solid ${inFirst?"#c0392b":alreadyDown?"rgba(212,160,23,0.6)":state.stagingGroups.length?"#4a90d9":"rgba(212,160,23,0.18)"}`,
-        boxShadow:inFirst?"0 0 12px rgba(192,57,43,0.25)":alreadyDown?"0 0 10px rgba(212,160,23,0.15)":state.stagingGroups.length?"0 0 8px rgba(74,144,217,0.15)":"none",
-      }}>
-        {/* Staging */}
-        {!alreadyDown&&(
+      {/* ── BOTTOM — staging + hand + action bar ── */}
+      <div style={{flexShrink:0,display:"flex",flexDirection:"column",gap:3}}>
+
+        {/* Staging area */}
+        {!alreadyDown&&state.stagingGroups.length>0&&(
           <StagingArea stagingGroups={state.stagingGroups} hand={state.hands[0]}
             contract={contract} onDisband={(gi)=>dispatch({type:"DISBAND_GROUP",groupIdx:gi})}
             canDisband={canMeld}/>
         )}
 
-        {/* Hand header + buttons */}
-        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",
-          marginBottom:6,flexWrap:"wrap",gap:5}}>
-          <div style={{display:"flex",alignItems:"center",gap:7,flexWrap:"wrap"}}>
-            <span style={{fontSize:9,letterSpacing:1,color:"#d4a017",textTransform:"uppercase",fontWeight:700}}>
+        {/* Hand row */}
+        <div style={{
+          background:"rgba(0,0,0,0.25)",borderRadius:"10px 10px 0 0",
+          padding:"6px 8px 4px",
+          border:`1.5px solid ${inFirst?"#c0392b":alreadyDown?"rgba(212,160,23,0.5)":state.stagingGroups.length?"#4a90d9":"rgba(255,255,255,0.06)"}`,
+          borderBottom:"none",
+        }}>
+          {/* Hand label */}
+          <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:4}}>
+            <span style={{fontSize:8,letterSpacing:1,color:"#d4a017",textTransform:"uppercase",fontWeight:700}}>
               Your Hand ({state.hands[0].length})
             </span>
-            {inFirst&&<span style={{fontSize:9,color:"#e74c3c",fontWeight:700}}>SELECT 1 TO DISCARD FIRST</span>}
-            {alreadyDown&&<span style={{fontSize:9,color:"#d4a017"}}>✓ DOWN</span>}
-            <span style={{fontSize:8,color:"#4a7060"}}>Buys:{state.buysUsed[0]}/3</span>
-            {!alreadyDown&&state.stagingGroups.length>0&&(
-              <span style={{fontSize:9,color:"#4a90d9"}}>
-                {state.stagingGroups.length}/{contract.sets+contract.runs} staged
-              </span>
-            )}
+            {inFirst&&<span style={{fontSize:8,color:"#e74c3c",fontWeight:700}}>— SELECT 1 TO DISCARD</span>}
+            {alreadyDown&&<span style={{fontSize:8,color:"#d4a017"}}>✓ DOWN</span>}
+            <span style={{fontSize:7,color:"#3a6a4a",marginLeft:"auto"}}>Buys: {state.buysUsed[0]}/3</span>
           </div>
-          <div style={{display:"flex",gap:5,flexWrap:"wrap"}}>
-            {inFirst
-              ?<Btn label="Discard to Start" color="#e74c3c"
-                  disabled={state.selectedCards.length!==1}
-                  onClick={()=>dispatch({type:"FIRST_DISCARD"})}/>
-              :<>
-                {!alreadyDown&&<>
-                  <Btn label="Stage" color="#4a90d9" disabled={!canStage}
-                    onClick={()=>dispatch({type:"STAGE_GROUP"})}/>
-                  <Btn label="Go Down ↓" color="#d4a017" disabled={!canGoDown}
-                    onClick={()=>dispatch({type:"GO_DOWN"})}/>
-                </>}
-                <Btn label="Discard" color="#b05020"
-                  disabled={!canMeld||state.selectedCards.length!==1||stagedIds.has(state.selectedCards[0])}
-                  onClick={()=>dispatch({type:"DISCARD"})}/>
-              </>
-            }
+          {/* Cards */}
+          <div style={{overflow:"hidden",borderRadius:4}}>
+            <div style={{overflowX:"auto",WebkitOverflowScrolling:"touch",paddingBottom:10,paddingTop:14}}>
+              <div style={{display:"flex",gap:4,width:"max-content",margin:"0 auto"}}>
+                {state.hands[0].map((card,i)=>{
+                  const isStaged=stagedIds.has(card.id);
+                  const isSelected=state.selectedCards.includes(card.id);
+                  return(
+                    <Card key={card.id} card={card}
+                      selected={isSelected} staged={isStaged&&!isSelected}
+                      onClick={()=>{
+                        if(inFirst) dispatch({type:"TOGGLE_CARD_FIRST",id:card.id});
+                        else if(canMeld&&!isStaged) dispatch({type:"TOGGLE_CARD",id:card.id});
+                      }}
+                      data-cardidx={i}
+                      draggable={!isStaged}
+                      onDragStart={!isStaged?(e)=>{ drag.onDragStart(i); draggingCardId.current=card.id; e.dataTransfer.setData('cardId',card.id); }:undefined}
+                      onDragOver={!isStaged?(e)=>drag.onDragOver(e,i):undefined}
+                      onDragEnd={!isStaged?()=>{ drag.onDragEnd(); draggingCardId.current=null; setDiscardHover(false); }:undefined}
+                    />
+                  );
+                })}
+              </div>
+            </div>
           </div>
         </div>
 
-        {/* Card row — clips top of rising selected cards */}
-        <div style={{overflow:"hidden",borderRadius:"8px 8px 0 0",marginTop:4}}>  
-        <div style={{overflowX:"auto",WebkitOverflowScrolling:"touch",paddingBottom:8,paddingTop:20,touchAction:"pan-x"}}>
-          <div style={{display:"flex",gap:5,width:"max-content",margin:"0 auto"}}>
-            {state.hands[0].map((card,i)=>{
-              const isStaged=stagedIds.has(card.id);
-              const isSelected=state.selectedCards.includes(card.id);
-              return(
-                <Card key={card.id} card={card}
-                  selected={isSelected} staged={isStaged&&!isSelected}
-                  onClick={()=>{
-                    if(inFirst) dispatch({type:"TOGGLE_CARD_FIRST",id:card.id});
-                    else if(canMeld&&!isStaged) dispatch({type:"TOGGLE_CARD",id:card.id});
-                  }}
-                  data-cardidx={i}
-                  draggable={!isStaged}
-                  onDragStart={!isStaged?(e)=>{ drag.onDragStart(i); draggingCardId.current=card.id; e.dataTransfer.setData('cardId',card.id); }:undefined}
-                  onDragOver={!isStaged?(e)=>drag.onDragOver(e,i):undefined}
-                  onDragEnd={!isStaged?()=>{ drag.onDragEnd(); draggingCardId.current=null; setDiscardHover(false); }:undefined}
-                />
-              );
-            })}
+        {/* Action bar */}
+        <div style={{
+          background:"rgba(0,0,0,0.35)",borderRadius:"0 0 10px 10px",
+          padding:"5px 8px",
+          display:"flex",gap:6,alignItems:"center",flexWrap:"wrap",
+          borderTop:"1px solid rgba(255,255,255,0.06)",
+        }}>
+          {inFirst?(
+            <Btn label="Discard to Start" color="#e74c3c"
+              disabled={state.selectedCards.length!==1}
+              onClick={()=>dispatch({type:"FIRST_DISCARD"})}/>
+          ):(
+            <>
+              {!alreadyDown&&<>
+                <Btn label="Stage" color="#4a90d9" disabled={!canStage}
+                  onClick={()=>dispatch({type:"STAGE_GROUP"})}/>
+                <Btn label="Go Down ↓" color="#d4a017" disabled={!canGoDown}
+                  onClick={()=>dispatch({type:"GO_DOWN"})}/>
+              </>}
+              <Btn label="Discard" color="#b05020"
+                disabled={!canMeld||state.selectedCards.length!==1||stagedIds.has(state.selectedCards[0])}
+                onClick={()=>dispatch({type:"DISCARD"})}/>
+              {!alreadyDown&&state.stagingGroups.length>0&&(
+                <span style={{fontSize:8,color:"#4a90d9",marginLeft:4}}>
+                  {state.stagingGroups.length}/{contract.sets+contract.runs} staged
+                </span>
+              )}
+            </>
+          )}
+          <div style={{marginLeft:"auto",fontSize:8,color:"#3a6a4a",fontStyle:"italic"}}>
+            {alreadyDown?"Tap card → tap meld to lay off":"Drag to center to discard"}
           </div>
-        </div>
-        </div>
-        <div style={{fontSize:8,color:"#3a6a4a",fontStyle:"italic",marginTop:2}}>
-          {alreadyDown
-            ?"Tap 1 card → tap a meld above to lay off · Or Discard"
-            :"Select cards → Stage · Stage all groups → Go Down ↓ · Tap staged group to disband"}
         </div>
       </div>
 
-      {/* Buy window */}
+      {/* ── BUY WINDOW ── */}
       {state.buyWindow&&(
-        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.65)",
-          display:"flex",alignItems:"center",justifyContent:"center",zIndex:90}}>
-          <div style={{background:"linear-gradient(160deg,#1a3d28,#0d2318)",
-            border:"2px solid #4a90d9",borderRadius:14,
-            padding:"22px 32px",textAlign:"center",maxWidth:300}}>
-            <div style={{fontSize:11,letterSpacing:2,color:"#4a90d9",textTransform:"uppercase",marginBottom:6}}>
-              Buy Opportunity
-            </div>
-            <div style={{fontSize:13,color:"#a8c8b0",marginBottom:14,lineHeight:1.6}}>
-              {state.message}
-            </div>
-            {/* Show the card */}
-            <div style={{display:"flex",justifyContent:"center",marginBottom:16}}>
+        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.7)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:90}}>
+          <div style={{background:"linear-gradient(160deg,#1a3d28,#0d2318)",border:"2px solid #4a90d9",borderRadius:14,padding:"20px 28px",textAlign:"center",maxWidth:280}}>
+            <div style={{fontSize:10,letterSpacing:2,color:"#4a90d9",textTransform:"uppercase",marginBottom:6}}>Buy Opportunity</div>
+            <div style={{fontSize:12,color:"#a8c8b0",marginBottom:12,lineHeight:1.5}}>{state.message}</div>
+            <div style={{display:"flex",justifyContent:"center",marginBottom:12}}>
               {state.buyWindowCard&&<Card card={state.buyWindowCard}/>}
             </div>
-            <div style={{fontSize:10,color:"#7ab88a",marginBottom:14}}>
-              You have used {state.buysUsed[0]}/3 buys this round
-            </div>
+            <div style={{fontSize:9,color:"#7ab88a",marginBottom:12}}>Buys used: {state.buysUsed[0]}/3</div>
             <div style={{display:"flex",gap:10,justifyContent:"center"}}>
-              <button
-                onClick={()=>dispatch({type:"PLAYER_BUY"})}
-                disabled={state.buysUsed[0]>=3||state.metContract[0]}
-                style={{
-                  background:state.buysUsed[0]>=3||state.metContract[0]?"rgba(255,255,255,0.05)":"rgba(74,144,217,0.2)",
+              <button onClick={()=>dispatch({type:"PLAYER_BUY"})} disabled={state.buysUsed[0]>=3||state.metContract[0]}
+                style={{background:state.buysUsed[0]>=3||state.metContract[0]?"rgba(255,255,255,0.05)":"rgba(74,144,217,0.2)",
                   border:`1px solid ${state.buysUsed[0]>=3||state.metContract[0]?"rgba(255,255,255,0.1)":"#4a90d9"}`,
                   borderRadius:7,color:state.buysUsed[0]>=3||state.metContract[0]?"#385248":"#4a90d9",
-                  fontWeight:700,fontSize:12,padding:"8px 20px",
-                  cursor:state.buysUsed[0]>=3||state.metContract[0]?"not-allowed":"pointer",
-                  fontFamily:"Georgia,serif",letterSpacing:0.5,
-                }}>
-                Buy (+1 card)
-              </button>
-              <button
-                onClick={()=>dispatch({type:"PASS_BUY"})}
-                style={{
-                  background:"rgba(176,80,32,0.15)",border:"1px solid #b05020",
-                  borderRadius:7,color:"#b05020",fontWeight:700,fontSize:12,
-                  padding:"8px 20px",cursor:"pointer",
-                  fontFamily:"Georgia,serif",letterSpacing:0.5,
-                }}>
-                Pass
-              </button>
+                  fontWeight:700,fontSize:12,padding:"8px 20px",cursor:state.buysUsed[0]>=3||state.metContract[0]?"not-allowed":"pointer",
+                  fontFamily:"Georgia,serif"}}>Buy (+1 card)</button>
+              <button onClick={()=>dispatch({type:"PASS_BUY"})}
+                style={{background:"rgba(176,80,32,0.15)",border:"1px solid #b05020",borderRadius:7,
+                  color:"#b05020",fontWeight:700,fontSize:12,padding:"8px 20px",cursor:"pointer",fontFamily:"Georgia,serif"}}>Pass</button>
             </div>
           </div>
         </div>
       )}
 
-      {/* Round/game over */}
+      {/* ── ROUND / GAME OVER ── */}
       {state.roundOver&&(
-        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.82)",
-          display:"flex",alignItems:"center",justifyContent:"center",zIndex:100}}>
-          <div style={{background:"linear-gradient(160deg,#1a3d28,#0d2318)",
-            border:"2px solid #d4a017",borderRadius:14,
-            padding:"24px 36px",textAlign:"center",maxWidth:360}}>
-            <div style={{fontSize:24,color:"#d4a017",marginBottom:6,fontWeight:700}}>
-              {state.gameOver?"Game Over!":"Round Over!"}
-            </div>
+        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.82)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:100}}>
+          <div style={{background:"linear-gradient(160deg,#1a3d28,#0d2318)",border:"2px solid #d4a017",borderRadius:14,padding:"24px 36px",textAlign:"center",maxWidth:360}}>
+            <div style={{fontSize:24,color:"#d4a017",marginBottom:6,fontWeight:700}}>{state.gameOver?"Game Over!":"Round Over!"}</div>
             <div style={{fontSize:13,color:"#a8c8b0",marginBottom:14,lineHeight:1.6}}>{state.message}</div>
             <div style={{display:"flex",gap:8,justifyContent:"center",marginBottom:14,flexWrap:"wrap"}}>
               {[["You",0],...AI_NAMES.map((n,i)=>[n,i+1])].map(([name,idx])=>(
-                <div key={idx} style={{textAlign:"center",padding:"5px 10px",
-                  background:"rgba(0,0,0,0.3)",borderRadius:7,
-                  border:"1px solid rgba(255,255,255,0.09)"}}>
+                <div key={idx} style={{textAlign:"center",padding:"5px 10px",background:"rgba(0,0,0,0.3)",borderRadius:7,border:"1px solid rgba(255,255,255,0.09)"}}>
                   <div style={{fontSize:9,color:"#7ab88a",textTransform:"uppercase"}}>{name}</div>
                   <div style={{fontSize:19,fontWeight:700}}>{state.gameScores[idx]}</div>
                 </div>
               ))}
             </div>
-            {state.gameOver&&(
-              <div style={{fontSize:15,color:"#d4a017",marginBottom:12,fontWeight:700}}>
-                🏆 {state.winnerName} wins!
-              </div>
-            )}
+            {state.gameOver&&<div style={{fontSize:15,color:"#d4a017",marginBottom:12,fontWeight:700}}>🏆 {state.winnerName} wins!</div>}
             <button onClick={()=>dispatch({type:state.gameOver?"NEW_GAME":"NEXT_ROUND"})}
-              style={{background:"linear-gradient(135deg,#d4a017,#b8860b)",
-                border:"none",borderRadius:8,color:"#1a1a0a",
-                fontWeight:700,fontSize:13,padding:"9px 26px",
-                cursor:"pointer",letterSpacing:1}}>
+              style={{background:"linear-gradient(135deg,#d4a017,#b8860b)",border:"none",borderRadius:8,color:"#1a1a0a",fontWeight:700,fontSize:13,padding:"9px 26px",cursor:"pointer",letterSpacing:1}}>
               {state.gameOver?"New Game":"Next Round →"}
             </button>
           </div>
