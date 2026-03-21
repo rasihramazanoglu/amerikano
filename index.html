@@ -9,7 +9,19 @@
     <title>Amerikano — Contract Rummy</title>
     <style>
       * { -webkit-tap-highlight-color: transparent; box-sizing: border-box; }
-      body { margin: 0; overscroll-behavior: none; }
+      html, body { margin: 0; padding: 0; height: 100%; overscroll-behavior: none; }
+      #root { height: 100%; }
+      /* Lock landscape on mobile via CSS hint */
+      @media screen and (max-width: 768px) and (orientation: portrait) {
+        body::before {
+          content: "↺  Rotate to landscape for best experience";
+          position: fixed; inset: 0; z-index: 9999;
+          display: flex; align-items: center; justify-content: center;
+          background: #071c0f; color: #d4a017;
+          font-family: Georgia, serif; font-size: 18px; text-align: center;
+          padding: 20px;
+        }
+      }
     </style>
   </head>
   <body>
