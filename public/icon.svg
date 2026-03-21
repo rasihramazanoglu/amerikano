@@ -2,11 +2,9 @@
   <rect width="512" height="512" rx="80" fill="#071c0f"/>
   <rect x="12" y="12" width="488" height="488" rx="72" fill="#0b2b1a"/>
   <rect x="24" y="24" width="464" height="464" rx="64" fill="#0f3520"/>
-  <!-- Card suit corners -->
   <text x="52" y="108" font-size="72" fill="#d4a017" font-family="Georgia,serif" font-weight="bold">A</text>
   <text x="52" y="168" font-size="52" fill="#d4a017" font-family="Georgia,serif">♠</text>
   <text x="460" y="420" font-size="72" fill="#d4a017" font-family="Georgia,serif" font-weight="bold" transform="rotate(180,460,420)">A</text>
   <text x="460" y="478" font-size="52" fill="#d4a017" font-family="Georgia,serif" transform="rotate(180,460,478)">♠</text>
-  <!-- Large center spade -->
   <text x="256" y="320" font-size="220" fill="#d4a017" font-family="Georgia,serif" text-anchor="middle">♠</text>
 </svg>
